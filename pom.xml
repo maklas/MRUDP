@@ -17,7 +17,7 @@
 
     <build>
         <plugins>
-            <plugin>  <!-- Create sources.jar -->
+            <plugin>  <!-- Is used to generate sources on jitpack.io -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <executions>
