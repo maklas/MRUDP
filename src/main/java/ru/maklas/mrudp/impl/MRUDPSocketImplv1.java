@@ -50,7 +50,6 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
         receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
-        //service = Executors.newFixedThreadPool(numberOfThreads);
         final ThreadFactory threadFactory = new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -63,7 +62,7 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
 
         filter = new NoFilter();
         receiverThread = new Thread(this);
-        receiverThread.setDaemon(true);
+        receiverThread.setDaemon(daemon);
         receiverThread.start();
         updateThread = new Thread(new Runnable() {
             @Override
@@ -79,7 +78,7 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
             }
         });
 
-        updateThread.setDaemon(true);
+        updateThread.setDaemon(daemon);
         updateThread.start();
     }
 
