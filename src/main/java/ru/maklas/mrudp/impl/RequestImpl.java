@@ -7,7 +7,7 @@ import java.net.InetAddress;
 
 /**
  * Created by maklas on 11.09.2017.
- * <p>Имплиментация реквеста</p>
+ * <p>Request Implementation</p>
  */
 public class RequestImpl implements RequestWriter {
 

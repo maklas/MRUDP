@@ -7,7 +7,7 @@ import ru.maklas.mrudp.ResponseHandler;
 
 /**
  * Created by maklas on 12.09.2017.
- * <p>Адаптер с пустыми значениями</p>
+ * <p>Adapter with empty values and methods</p>
  */
 
 public class ResponseAdapter implements ResponseHandler {

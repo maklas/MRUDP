@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 11.09.2017.
- * Статичные переменные и методы для обработки кодов ответа
+ * Static fields and methods for RequestCode and ResponseCode processing
  */
 public class SocketUtils {
 

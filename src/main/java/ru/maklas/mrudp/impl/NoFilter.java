@@ -9,7 +9,7 @@ import java.net.InetAddress;
 
 /**
  * Created by maklas on 11.09.2017.
- * <p>Пустой фильтр. Пропускает все запросы</p>
+ * <p>Empty filter. Lets through all requests</p>
  */
 public class NoFilter implements SocketFilter {
 

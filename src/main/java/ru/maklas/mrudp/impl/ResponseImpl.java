@@ -7,7 +7,7 @@ import java.net.InetAddress;
 
 /**
  * Created by maklas on 11.09.2017.
- * <p>Имплиментация ответа сервера</p>
+ * <p>Implementation for Response</p>
  */
 public class ResponseImpl implements Response {
 

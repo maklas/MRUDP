@@ -2,24 +2,27 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 12.09.2017.
- * Пакет данных для ответа клиенту
+ * Packet for response
  */
 
 public interface ResponseWriter extends AddressContainer, Response {
 
     /**
-     * Установка данных для отправки в ответе
+     * Setting data that's going to be sent back
      */
     void setData(byte[] data);
 
     /**
-     * Тип ответа (OK/ERROR)
+     * SetData as String
+     */
+    void setData(String data);
+
+    /**
+     *  Type of response (OK/ERROR)
+     *  @see SocketUtils
      */
     void setResponseCode(int responseCode);
 
-    /**
-     * Установка данных для отправки в ответе
-     */
-    void setData(String data);
+
 
 }

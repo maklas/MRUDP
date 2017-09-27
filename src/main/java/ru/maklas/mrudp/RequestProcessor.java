@@ -2,15 +2,14 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 11.09.2017.
- * Обработчик получаемых запросов, задача которого читать @see request, записывать данные в response,
- * в случае если это необходимо
+ *
+ * Processor for received requests. It's purpose is to read Requests and produce a responses for client some time later.
+ * @see Request
  */
 public interface RequestProcessor {
 
     /**
-     * Отвечает на запрос от клиента. Этот метод может вызываться несколькими тредами сразу!
-     * В request создаржатся данные от клиента.
-     * В response записывается ответ для клиента.
+     * Processes Request and Produces a Response
      * @param request data from client
      * @param response data for client
      */

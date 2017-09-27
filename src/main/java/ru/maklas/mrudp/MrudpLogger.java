@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 26.09.2017.
- * <p>Логгер для сообщения внутренних собыйтий MRUDP сокета</p>
+ * <p>Logger for notifying about inside processes of MRUDPSocket</p>
  */
 public interface MrudpLogger {
 

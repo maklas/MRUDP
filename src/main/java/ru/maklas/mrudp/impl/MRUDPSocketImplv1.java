@@ -17,9 +17,14 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * Created by maklas on 11.09.2017.
- * <p>Простая имплиментация MRUDP сокета</p>
+ * <p>Basic MRUDP implementation</p>
+ * <p>Features:
+ * <li>Connection filtering;</li>
+ * <li>Multithreaded request processing and response handling;</li>
+ * <li>Sends lost packet multiple times if it's lost;</li>
+ * <li>Watching over packets using sequence number.</li></p>
  */
-public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
+public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
 
     private MrudpLogger logger;
     private final HashMap<Integer, RequestHandleWrap> requestHashMap;
@@ -39,7 +44,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private SocketFilter filter;
     private RequestProcessor processor;
 
-    public MRUDPSocketImpl(DatagramSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
+    public MRUDPSocketImplv1(DatagramSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
         bufferSize+= 6;
         this.socket = dSocket;
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
@@ -78,7 +83,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         updateThread.start();
     }
 
-    public MRUDPSocketImpl(DatagramSocket socket, int bufferSize) throws Exception {
+    public MRUDPSocketImplv1(DatagramSocket socket, int bufferSize) throws Exception {
         this(socket, bufferSize, true);
     }
 

@@ -8,7 +8,7 @@ import java.net.InetAddress;
 
 /**
  * Created by maklas on 12.09.2017.
- * <p>Имплиментация пакета для ответа на запрос</p>
+ * <p>Implementation for ResponseWriter</p>
  */
 
 public class ResponseWriterImpl extends ResponseImpl implements ResponseWriter {

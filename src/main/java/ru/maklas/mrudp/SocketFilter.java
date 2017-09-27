@@ -4,19 +4,19 @@ import java.net.InetAddress;
 
 /**
  * Created by maklas on 11.09.2017.
- * Фильтрует запросы от клиентов на основании IP, порта и запроса
+ * Filters request for socket by address, port and request data
  */
 public interface SocketFilter {
 
     /**
-     *  <p>Фильтрует запрос</p>
-     *  <p><b>True</b> чтобы принять запрос </p>
-     *  <p><b>False</b> чтобы отклонить</p>
+     *  <p>Filters request</p>
+     *  <li><b>True</b> to accept</li>
+     *  <li><b>False</b> to decline</li>
      */
     boolean filter(InetAddress address, int port, Request request);
 
     /**
-     * Определяет какой тип ошибки отправить клиенту если он был отфильтрован
+     * Error code that has to be returned if packet was filtered
      */
     int errorCodeToReturn();
 

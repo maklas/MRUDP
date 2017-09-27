@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 11.09.2017.
- * Запрос
+ * Request to be processed
  */
 public interface Request extends AddressContainer{
 

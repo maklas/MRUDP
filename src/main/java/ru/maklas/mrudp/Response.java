@@ -2,27 +2,28 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 11.09.2017.
- * Ответ от сервера
+ * Response from server
  */
 public interface Response extends AddressContainer {
 
     /**
-     * @return Данные содержащиеся в ответе
+     * @return Data inside Response
      */
     byte[] getData();
 
     /**
-     * @return Данные содержащиеся в ответе
+     * @return Data as string
      */
     String getDataAsString();
 
     /**
-     * @return Код ответа (OK/ERROR)
+     * @return Code of response (OK/ERROR)
+     * @see SocketUtils
      */
     int getResponseCode();
 
     /**
-     * @return Номер пакета
+     * @return Packet sequence number
      */
     int getSequenceNumber();
 

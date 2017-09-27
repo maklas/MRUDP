@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 /**
  * Created by maklas on 12.09.2017.
- * Ответ от сервера с возможностью заносить данные
+ * Request from server with the ability to write in it
  */
 public interface RequestWriter extends Request {
 
