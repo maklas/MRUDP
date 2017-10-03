@@ -360,6 +360,11 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
         }
     }
 
+    @Override
+    public int getLocalPort() {
+        return socket.getLocalPort();
+    }
+
     //*********//
     // Helpers //
     //*********//

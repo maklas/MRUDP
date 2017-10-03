@@ -28,6 +28,8 @@ public interface MRUDPSocket {
 
     void setResponseTimeout(int ms);
 
+    int getLocalPort();
+
     void setLogger(MrudpLogger logger);
 
 }
