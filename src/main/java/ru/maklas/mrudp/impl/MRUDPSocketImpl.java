@@ -5,7 +5,6 @@ import ru.maklas.mrudp.*;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
@@ -24,11 +23,11 @@ import java.util.concurrent.ThreadFactory;
  * <li>Sends lost packet multiple times if it's lost;</li>
  * <li>Watching over packets using sequence number.</li></p>
  */
-public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
+public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     private MrudpLogger logger;
     private final HashMap<Integer, RequestHandleWrap> requestHashMap;
-    private final DatagramSocket socket;
+    private final UDPSocket socket;
     private final Thread receiverThread;
     private final Thread updateThread;
     private final ExecutorService service;
@@ -44,7 +43,7 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
     private SocketFilter filter;
     private RequestProcessor processor;
 
-    public MRUDPSocketImplv1(DatagramSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
+    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
         bufferSize+= 6;
         this.socket = dSocket;
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
@@ -82,7 +81,7 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
         updateThread.start();
     }
 
-    public MRUDPSocketImplv1(DatagramSocket socket, int bufferSize) throws Exception {
+    public MRUDPSocketImpl(UDPSocket socket, int bufferSize) throws Exception {
         this(socket, bufferSize, true);
     }
 
@@ -220,6 +219,7 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
                                     }
                                 } catch (Exception e) {
                                     log("exception while processing request" + e.getClass().getSimpleName());
+                                    e.printStackTrace();
                                 }
                             }
                         });
@@ -264,8 +264,8 @@ public class MRUDPSocketImplv1 implements Runnable, MRUDPSocket {
                 }
 
 
-            } catch (SocketException se){
-                //logger.log(Level.INFO, "Got bad msg. Quitting");
+            } catch (SocketException se) {
+                //log("Got bad msg. Quitting");
                 break;
             } catch (IOException e){
                 log("IOE in receiving thread");
