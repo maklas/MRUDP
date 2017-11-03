@@ -8,4 +8,6 @@ public interface MrudpLogger {
 
     void log(String msg);
 
+    void log(Exception e);
+
 }

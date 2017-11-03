@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import ru.maklas.mrudp.impl.FutureResponse;
+
 import java.net.InetAddress;
 
 /**
@@ -21,6 +23,10 @@ public interface MRUDPSocket {
     void sendRequest(InetAddress address, int port, String data, ResponseHandler handler);
 
     void sendRequest(InetAddress address, int port, String data);
+
+    FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data);
+
+    FutureResponse sendRequestGetFuture(InetAddress address, int port, String data);
 
     void resendRequest(Request request, ResponseHandler handler);
 

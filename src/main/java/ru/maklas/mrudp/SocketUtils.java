@@ -15,6 +15,7 @@ public class SocketUtils {
     public static final int BAD_REQUEST = -102;
     public static final int INTERNAL_SERVER_ERROR = -103;
     public static final int ACCESS_DENIED_ERROR = -104;
+    public static final int DISCARDED = 0;
 
     public static boolean isResponseType(int code){
         return code == 3 || code == 100 || (code >= -104 && code <= -100);
@@ -26,6 +27,10 @@ public class SocketUtils {
 
     public static String errorCodeToString(int errorCode){
         switch (errorCode){
+            case 0:
+                return "Discarded";
+            case 100 :
+                return "Ok";
             case -100:
                 return "Undefined Error";
             case -101:

@@ -55,7 +55,9 @@ public class LocalUDPSocket implements UDPSocket{
     public void send(DatagramPacket packet) throws Exception {
         DataPacket data = new DataPacket(localPort, packet.getData(), packet.getOffset(), packet.getLength());
         for (LocalUDPSocket connectedSocket : connectedSockets) {
-            connectedSocket.propagate(data);
+            if (connectedSocket.getLocalPort() == packet.getPort()) {
+                connectedSocket.propagate(data);
+            }
         }
 
     }

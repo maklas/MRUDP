@@ -218,8 +218,10 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                                         sendResponse(response);
                                     }
                                 } catch (Exception e) {
-                                    log("exception while processing request" + e.getClass().getSimpleName());
-                                    e.printStackTrace();
+                                    log("exception while processing request: " + e.getClass().getSimpleName() +
+                                    ".\n" + "Request=" + request.getDataAsString() + "\n" +
+                                    "Response=" + response.getDataAsString());
+                                    log(e);
                                 }
                             }
                         });
@@ -229,7 +231,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         try {
                             sendResponse(response);
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            log(e);
                         }
                     }
                 } else {
@@ -318,6 +320,41 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     @Override
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data) {
+        final FutureResponse ret = new FutureResponse();
+
+        sendRequest(address, port, data, new ResponseHandler() {
+            @Override
+            public void handle(Request request, Response response) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData()));
+            }
+
+            @Override
+            public void handleError(Request request, Response response, int errorCode) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Error, response.getResponseCode(), response.getData()));
+            }
+
+            @Override
+            public void discard(Request request) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, 0));
+            }
+
+            @Override
+            public int getTimesToResend() {
+                return 0;
+            }
+        });
+
+
+        return ret;
+    }
+
+    @Override
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, String data) {
+        return sendRequestGetFuture(address, port, data.getBytes());
+    }
+
+    @Override
     public void resendRequest(final Request request, final ResponseHandler handler){
         RequestWriter newRequest = new RequestImpl(request.getSequenceNumber(), request.getAddress(), request.getPort(), request.getData(), request.responseRequired());
         newRequest.setTimesRequested(request.getTimesRequested());
@@ -357,6 +394,12 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private void log(String msg){
         if (logger != null){
             logger.log(msg);
+        }
+    }
+
+    private void log(Exception e){
+        if (logger != null){
+            logger.log(e);
         }
     }
 
