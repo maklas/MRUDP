@@ -10,6 +10,9 @@ public class FutureResponse {
     private boolean released = false;
 
     synchronized void put(ResponsePackage data){
+        if (released){
+            return;
+        }
         this.data = data;
         this.released = true;
         this.notify();
@@ -23,6 +26,10 @@ public class FutureResponse {
         } catch (InterruptedException ignore) {}
 
         return data;
+    }
+
+    public synchronized boolean isReady(){
+        return released;
     }
 
 }

@@ -306,7 +306,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     @Override
-    public FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, byte[] data) {
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, final int resendTries, byte[] data) {
         final FutureResponse ret = new FutureResponse();
 
         sendRequest(address, port, data, discardTime, new ResponseHandler() {
@@ -327,7 +327,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
             @Override
             public int getTimesToResend() {
-                return 0;
+                return resendTries;
             }
         });
 
@@ -337,7 +337,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public FutureResponse sendRequestGetFuture(InetAddress address, int port, String data) {
-        return sendRequestGetFuture(address, port, DISCARD_TIME_MS, data.getBytes());
+        return sendRequestGetFuture(address, port, DISCARD_TIME_MS, 0, data.getBytes());
     }
 
     @Override

@@ -26,7 +26,7 @@ public class RequestImpl implements RequestWriter {
         this.data = data;
         this.responseRequired = responseRequired;
         this.discardTime = discardTime;
-        timesRequested = 0;
+        this.timesRequested = 0;
     }
 
     @Override
