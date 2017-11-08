@@ -14,17 +14,15 @@ public interface MRUDPSocket {
 
     void setProcessor(RequestProcessor listener);
 
-    void setFilter(SocketFilter filter);
-
-    void sendRequest(InetAddress address, int port, byte[] data, ResponseHandler handler);
+    void sendRequest(InetAddress address, int port, byte[] data, int discardTime, ResponseHandler handler);
 
     void sendRequest(InetAddress address, int port, byte[] data);
 
-    void sendRequest(InetAddress address, int port, String data, ResponseHandler handler);
+    void sendRequest(InetAddress address, int port, String data, int discardTime, ResponseHandler handler);
 
     void sendRequest(InetAddress address, int port, String data);
 
-    FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data);
+    FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, byte[] data);
 
     FutureResponse sendRequestGetFuture(InetAddress address, int port, String data);
 

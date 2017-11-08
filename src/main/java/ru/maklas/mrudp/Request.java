@@ -18,4 +18,5 @@ public interface Request extends AddressContainer{
 
     boolean responseRequired();
 
+    int getDiscardTime();
 }

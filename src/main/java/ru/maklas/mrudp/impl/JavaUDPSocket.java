@@ -5,6 +5,7 @@ import ru.maklas.mrudp.UDPSocket;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketException;
 
 /**
  * Created by amaklakov on 02.11.2017.
@@ -13,9 +14,19 @@ public class JavaUDPSocket implements UDPSocket {
 
     private final DatagramSocket socket;
 
+    public JavaUDPSocket() throws SocketException {
+        this(new DatagramSocket());
+    }
+
+    public JavaUDPSocket(int port) throws SocketException {
+        this(new DatagramSocket(port));
+    }
+
     public JavaUDPSocket(DatagramSocket dSocket) {
         this.socket = dSocket;
     }
+
+
 
     @Override
     public int getLocalPort() {

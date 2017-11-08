@@ -17,13 +17,15 @@ public class RequestImpl implements RequestWriter {
     private final byte[] data;
     private final boolean responseRequired;
     private int timesRequested;
+    private int discardTime;
 
-    public RequestImpl(int sequence, InetAddress address, int port, byte[] data, boolean responseRequired) {
+    public RequestImpl(int sequence, InetAddress address, int port, byte[] data, boolean responseRequired, int discardTime) {
         this.sequence = sequence;
         this.address = address;
         this.port = port;
         this.data = data;
         this.responseRequired = responseRequired;
+        this.discardTime = discardTime;
         timesRequested = 0;
     }
 
@@ -79,5 +81,10 @@ public class RequestImpl implements RequestWriter {
     @Override
     public void setTimesRequested(int times) {
         timesRequested = times;
+    }
+
+    @Override
+    public int getDiscardTime() {
+        return discardTime;
     }
 }

@@ -35,16 +35,14 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final DatagramPacket sendingPacket;
     private final Object sendingMonitor = new Object();
     private final Object processorMonitor = new Object();
-    private static final int UPDATE_CD = 150;
-    private int DISCARD_TIME_MS = 3000;
-
+    public static final int UPDATE_CD = 75;
+    private int DISCARD_TIME_MS = 1500;
 
     private int seq = (int) (Math.random() * Long.MAX_VALUE);
-    private SocketFilter filter;
     private RequestProcessor processor;
 
     public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
-        bufferSize+= 6;
+        bufferSize += 6;
         this.socket = dSocket;
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
         receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
@@ -59,7 +57,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         };
         service = Executors.newCachedThreadPool(threadFactory);
 
-        filter = new NoFilter();
         receiverThread = new Thread(this);
         receiverThread.setDaemon(daemon);
         receiverThread.start();
@@ -98,11 +95,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     @Override
-    public void setFilter(SocketFilter filter) {
-        this.filter = filter;
-    }
-
-    @Override
     public void killConnection() {
         receiverThread.interrupt();
         service.shutdown();
@@ -123,7 +115,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
             for (Integer key : keys) {
                 RequestHandleWrap requestHandleWrap = requestHashMap.get(key);
-                if (requestHandleWrap.msSinceCreation() > DISCARD_TIME_MS) {
+                if (requestHandleWrap.msSinceCreation() > requestHandleWrap.request.getDiscardTime()) {
                     requiresRemoval.add(key);
                 }
             }
@@ -134,6 +126,9 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                 RequestHandleWrap triple;
                 synchronized (requestHashMap) {
                     triple = requestHashMap.remove(i);
+                }
+                if (triple == null){
+                    continue;
                 }
                 final RequestWriter request = triple.request;
                 final ResponseHandler handler = triple.handler;
@@ -191,49 +186,39 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         ((setByte & 1)      == 1)};
                 final boolean isRequest = settings[4];
                 final boolean needsResponse = settings[5];
-                final boolean alreadyBeenSent = settings[6];
-                final boolean isSplit = settings[7];
+                // for later usage // final boolean alreadyBeenSent = settings[6];
+                // for later usage // final boolean isSplit = settings[7];
                 final byte[] data = getDataFrom(fullData,6, fullLength - 6);
 
                 if (isRequest) {
 
                     //HANDLING REQUEST
 
-                    final Request request = new RequestImpl(seq, address, port, data, needsResponse);
+                    final Request request = new RequestImpl(seq, address, port, data, needsResponse, -1);
                     final ResponseWriter response = new ResponseWriterImpl(seq, address, port, SocketUtils.OK);
 
                     final RequestProcessor processor;
                     synchronized (processorMonitor){
                         processor = this.processor;
                     }
-                    boolean acceptable = this.filter.filter(address, port, request) && (processor != null);
-                    if (acceptable) {
-                        service.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    processor.process(request, response, needsResponse);
+                    service.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                processor.process(request, response, needsResponse);
 
-                                    if (needsResponse) {
-                                        sendResponse(response);
-                                    }
-                                } catch (Exception e) {
-                                    log("exception while processing request: " + e.getClass().getSimpleName() +
-                                    ".\n" + "Request=" + request.getDataAsString() + "\n" +
-                                    "Response=" + response.getDataAsString());
-                                    log(e);
+                                if (needsResponse) {
+                                    sendResponse(response);
                                 }
+                            } catch (Exception e) {
+                                log("exception while processing request: " + e.getClass().getSimpleName() +
+                                ".\n" + "Request=" + request.getDataAsString() + "\n" +
+                                "Response=" + response.getDataAsString());
+                                log(e);
                             }
-                        });
-                    } else {
-                        log(request + " was filtered");
-                        response.setResponseCode(filter.errorCodeToReturn());
-                        try {
-                            sendResponse(response);
-                        } catch (Exception e) {
-                            log(e);
                         }
-                    }
+                    });
+
                 } else {
 
                     //HANDLING RESPONSE
@@ -290,19 +275,19 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
 
     @Override
-    public void sendRequest(InetAddress address, int port, String data, ResponseHandler handler) {
-        sendRequest(address, port, data.getBytes(), handler);
+    public void sendRequest(InetAddress address, int port, String data, int discardTime, ResponseHandler handler) {
+        sendRequest(address, port, data.getBytes(), discardTime, handler);
     }
 
     @Override
     public void sendRequest(InetAddress address, int port, String data) {
-        sendRequest(address, port, data, null);
+        sendRequest(address, port, data, DISCARD_TIME_MS, null);
     }
 
     @Override
-    public void sendRequest(InetAddress address, int port, byte[] data, ResponseHandler handler){
+    public void sendRequest(InetAddress address, int port, byte[] data, int discardTime, ResponseHandler handler){
         boolean handlerExists = handler != null;
-        RequestWriter request = new RequestImpl(seq, address, port, data, handlerExists);
+        RequestWriter request = new RequestImpl(seq, address, port, data, handlerExists, discardTime);
 
         if (handlerExists) {
             synchronized (requestHashMap) {
@@ -316,14 +301,14 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public void sendRequest(InetAddress address, int port, byte[] data) {
-        sendRequest(address, port, data, null);
+        sendRequest(address, port, data, DISCARD_TIME_MS, null);
     }
 
     @Override
-    public FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data) {
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, byte[] data) {
         final FutureResponse ret = new FutureResponse();
 
-        sendRequest(address, port, data, new ResponseHandler() {
+        sendRequest(address, port, data, discardTime, new ResponseHandler() {
             @Override
             public void handle(Request request, Response response) {
                 ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData()));
@@ -351,12 +336,12 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public FutureResponse sendRequestGetFuture(InetAddress address, int port, String data) {
-        return sendRequestGetFuture(address, port, data.getBytes());
+        return sendRequestGetFuture(address, port, DISCARD_TIME_MS, data.getBytes());
     }
 
     @Override
     public void resendRequest(final Request request, final ResponseHandler handler){
-        RequestWriter newRequest = new RequestImpl(request.getSequenceNumber(), request.getAddress(), request.getPort(), request.getData(), request.responseRequired());
+        RequestWriter newRequest = new RequestImpl(request.getSequenceNumber(), request.getAddress(), request.getPort(), request.getData(), request.responseRequired(), request.getDiscardTime());
         newRequest.setTimesRequested(request.getTimesRequested());
 
         if (handler != null) {
