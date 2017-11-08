@@ -12,7 +12,7 @@ import java.net.InetAddress;
  */
 public interface MRUDPSocket {
 
-    void setProcessor(RequestProcessor listener);
+    void setProcessor(RequestProcessor processor);
 
     void sendRequest(InetAddress address, int port, byte[] data, int discardTime, ResponseHandler handler);
 

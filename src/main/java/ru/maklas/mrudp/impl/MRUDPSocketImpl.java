@@ -9,6 +9,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,13 +36,14 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final DatagramPacket sendingPacket;
     private final Object sendingMonitor = new Object();
     private final Object processorMonitor = new Object();
-    public static final int UPDATE_CD = 75;
+    public static final int DEFAULT_UPDATE_CD = 100;
+    public static final int DEFAULT_WORKERS = 50;
     private int DISCARD_TIME_MS = 1500;
 
     private int seq = (int) (Math.random() * Long.MAX_VALUE);
     private RequestProcessor processor;
 
-    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon) throws Exception {
+    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon, int workers, final int updateThreadCD) throws Exception {
         bufferSize += 6;
         this.socket = dSocket;
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
@@ -55,7 +57,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                 return thread;
             }
         };
-        service = Executors.newCachedThreadPool(threadFactory);
+        service = Executors.newFixedThreadPool(workers, threadFactory);
 
         receiverThread = new Thread(this);
         receiverThread.setDaemon(daemon);
@@ -65,7 +67,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
             public void run() {
                 try {
                     while (!Thread.interrupted()) {
-                        Thread.sleep(UPDATE_CD);
+                        Thread.sleep(updateThreadCD);
                         update();
                     }
                 } catch (InterruptedException e){
@@ -79,13 +81,13 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     public MRUDPSocketImpl(UDPSocket socket, int bufferSize) throws Exception {
-        this(socket, bufferSize, true);
+        this(socket, bufferSize, true, DEFAULT_WORKERS, DEFAULT_UPDATE_CD);
     }
 
     @Override
-    public void setProcessor(RequestProcessor listener) {
+    public void setProcessor(RequestProcessor processor) {
         synchronized (processorMonitor) {
-            this.processor = listener;
+            this.processor = processor;
         }
     }
 
@@ -110,13 +112,12 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final ArrayList<Integer> requiresRemoval = new ArrayList<Integer>();
     private void update(){
 
-        synchronized (requestHashMap) {
-            Set<Integer> keys = requestHashMap.keySet();
-
-            for (Integer key : keys) {
-                RequestHandleWrap requestHandleWrap = requestHashMap.get(key);
-                if (requestHandleWrap.msSinceCreation() > requestHandleWrap.request.getDiscardTime()) {
-                    requiresRemoval.add(key);
+        synchronized (requestHashMap){
+            Set<Map.Entry<Integer, MRUDPSocketImpl.RequestHandleWrap>> entries = requestHashMap.entrySet();
+            for (Map.Entry<Integer, MRUDPSocketImpl.RequestHandleWrap> entry : entries) {
+                MRUDPSocketImpl.RequestHandleWrap wrap = entry.getValue();
+                if (wrap.msSinceCreation() > wrap.request.getDiscardTime()){
+                    requiresRemoval.add(entry.getKey());
                 }
             }
         }
