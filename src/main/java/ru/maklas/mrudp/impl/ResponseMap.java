@@ -4,6 +4,7 @@ import ru.maklas.mrudp.Response;
 
 import java.net.InetAddress;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ResponseMap {
 

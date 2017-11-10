@@ -22,7 +22,7 @@ public interface MRUDPSocket {
 
     void sendRequest(InetAddress address, int port, String data);
 
-    FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, int resendTries, byte[] data);
+    FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, int resendTries);
 
     FutureResponse sendRequestGetFuture(InetAddress address, int port, String data);
 

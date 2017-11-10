@@ -26,6 +26,10 @@ import java.util.concurrent.ThreadFactory;
  */
 public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
+    public static final int DEFAULT_UPDATE_CD = 100;
+    public static final int DEFAULT_WORKERS = 50;
+    public static int DELETE_RESPONSES_MS = 10000;
+
     private MrudpLogger logger;
     private final HashMap<Integer, RequestHandleWrap> requestHashMap;
     private final UDPSocket socket;
@@ -36,20 +40,18 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final DatagramPacket sendingPacket;
     private final Object sendingMonitor = new Object();
     private final Object processorMonitor = new Object();
-    public static final int DEFAULT_UPDATE_CD = 100;
-    public static final int DEFAULT_WORKERS = 50;
     private int DISCARD_TIME_MS = 1500;
-    private int DELETE_RESPONSES_MS = 10000;
 
     private int seq = (int) (Math.random() * Long.MAX_VALUE);
     private RequestProcessor processor;
     private ResponseMap responseMap; // ctrl+F the "--1" to se usage. Can be safely deleted
 
-    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon, int workers, final int updateThreadCD) throws Exception {
+    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon, int workers, final int updateThreadCD, final int deleteResponseCD) throws Exception {
         bufferSize += 6;
         this.socket = dSocket;
+        this.processor = new NullProcessor();
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
-        responseMap = new ResponseMap(DELETE_RESPONSES_MS);
+        responseMap = new ResponseMap(deleteResponseCD);
         receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         final ThreadFactory threadFactory = new ThreadFactory() {
@@ -85,7 +87,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     public MRUDPSocketImpl(UDPSocket socket, int bufferSize) throws Exception {
-        this(socket, bufferSize, true, DEFAULT_WORKERS, DEFAULT_UPDATE_CD);
+        this(socket, bufferSize, true, DEFAULT_WORKERS, DEFAULT_UPDATE_CD, DELETE_RESPONSES_MS);
     }
 
     @Override
@@ -323,7 +325,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     @Override
-    public FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, final int resendTries, byte[] data) {
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, final int resendTries) {
         final FutureResponse ret = new FutureResponse();
 
         sendRequest(address, port, data, discardTime, new ResponseHandler() {
@@ -354,7 +356,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public FutureResponse sendRequestGetFuture(InetAddress address, int port, String data) {
-        return sendRequestGetFuture(address, port, DISCARD_TIME_MS, 0, data.getBytes());
+        return sendRequestGetFuture(address, port, data.getBytes(), DISCARD_TIME_MS, 0);
     }
 
     @Override
@@ -471,5 +473,11 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         }
     }
 
+    private class NullProcessor implements RequestProcessor {
+        @Override
+        public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
+        }
+    }
 
 }

@@ -175,9 +175,9 @@ public class TestsSocket {
         });
 
         long before = System.currentTimeMillis();
-        clientSocket.sendRequestGetFuture(localhost, port, discardTime, 1, "123".getBytes()).get();
+        clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
-        System.out.println("Time took: " + (after - before));
+        assertEquals(1500, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
 
@@ -235,7 +235,7 @@ public class TestsSocket {
                 success.set(true);
             }
         });
-        clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), 1500, 0, data).get();
+        clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), data, 1500, 0).get();
         assertEquals("wtf: " + size, success.get(), true);
     }
 
@@ -265,7 +265,7 @@ public class TestsSocket {
         }
 
         long after = System.currentTimeMillis();
-        System.out.println("Time took: " + (after - before));
+        System.out.println("Sequential data transmission for " + times + " packets took: " + (after - before) + " ms.");
     }
 
     @Test
