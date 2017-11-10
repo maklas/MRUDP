@@ -5,6 +5,7 @@ import ru.maklas.mrudp.ResponseWriter;
 import ru.maklas.mrudp.SocketUtils;
 
 import java.net.InetAddress;
+import java.util.Arrays;
 
 /**
  * Created by maklas on 12.09.2017.
@@ -12,6 +13,8 @@ import java.net.InetAddress;
  */
 
 public class ResponseWriterImpl extends ResponseImpl implements ResponseWriter {
+
+    private volatile boolean processing = true;
 
     ResponseWriterImpl(int sequenceNumber, InetAddress address, int port, int responseCode) {
         super(sequenceNumber, address, port, responseCode, new byte[0]);
@@ -35,5 +38,25 @@ public class ResponseWriterImpl extends ResponseImpl implements ResponseWriter {
         if (data != null) {
             setData(data.getBytes());
         }
+    }
+
+    @Override
+    public String toString() {
+        return "ResponseWriterImpl{" +
+                "address=" + address +
+                ", port=" + port +
+                ", seq=" + seq +
+                ", data=" + Arrays.toString(data) +
+                ", responseCode=" + responseCode +
+                '}';
+    }
+
+
+    boolean isProcessing(){
+        return processing;
+    }
+
+    void setProcessing(boolean processing){
+        this.processing = processing;
     }
 }

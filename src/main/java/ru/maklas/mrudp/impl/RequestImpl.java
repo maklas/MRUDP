@@ -18,13 +18,16 @@ public class RequestImpl implements RequestWriter {
     private final boolean responseRequired;
     private int timesRequested;
     private int discardTime;
+    private boolean hasAlreadyBeenSend;
 
-    public RequestImpl(int sequence, InetAddress address, int port, byte[] data, boolean responseRequired, int discardTime) {
+    public RequestImpl(int sequence, InetAddress address, int port, byte[] data,
+                       boolean responseRequired, boolean hasAlreadyBeenSend, int discardTime) {
         this.sequence = sequence;
         this.address = address;
         this.port = port;
         this.data = data;
         this.responseRequired = responseRequired;
+        this.hasAlreadyBeenSend = hasAlreadyBeenSend;
         this.discardTime = discardTime;
         this.timesRequested = 0;
     }
@@ -86,5 +89,10 @@ public class RequestImpl implements RequestWriter {
     @Override
     public int getDiscardTime() {
         return discardTime;
+    }
+
+    @Override
+    public boolean hasAlreadyBeenSend() {
+        return hasAlreadyBeenSend;
     }
 }

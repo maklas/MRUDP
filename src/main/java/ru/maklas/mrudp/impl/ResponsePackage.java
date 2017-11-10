@@ -31,6 +31,10 @@ public class ResponsePackage {
         return data;
     }
 
+    public String getDataAsString(){
+        return new String(data);
+    }
+
     public int getResponseCode() {
         return responseCode;
     }

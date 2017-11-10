@@ -19,4 +19,6 @@ public interface Request extends AddressContainer{
     boolean responseRequired();
 
     int getDiscardTime();
+
+    boolean hasAlreadyBeenSend();
 }
