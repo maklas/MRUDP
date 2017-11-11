@@ -40,7 +40,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final DatagramPacket sendingPacket;
     private final Object sendingMonitor = new Object();
     private final Object processorMonitor = new Object();
-    private int DISCARD_TIME_MS = 1500;
 
     private int seq = (int) (Math.random() * Long.MAX_VALUE);
     private RequestProcessor processor;
@@ -108,11 +107,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         service.shutdown();
         socket.close();
         updateThread.interrupt();
-    }
-
-    @Override
-    public void setResponseTimeout(int ms) {
-        DISCARD_TIME_MS = ms;
     }
 
     private final ArrayList<Integer> requiresRemoval = new ArrayList<Integer>();
@@ -301,7 +295,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public void sendRequest(InetAddress address, int port, String data) {
-        sendRequest(address, port, data, DISCARD_TIME_MS, null);
+        sendRequest(address, port, data, 0, null);
     }
 
     @Override
@@ -321,7 +315,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     @Override
     public void sendRequest(InetAddress address, int port, byte[] data) {
-        sendRequest(address, port, data, DISCARD_TIME_MS, null);
+        sendRequest(address, port, data, 0, null);
     }
 
     @Override
@@ -331,17 +325,17 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         sendRequest(address, port, data, discardTime, new ResponseHandler() {
             @Override
             public void handle(Request request, Response response) {
-                ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData()));
+                ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
             }
 
             @Override
             public void handleError(Request request, Response response, int errorCode) {
-                ret.put(new ResponsePackage(ResponsePackage.Type.Error, response.getResponseCode(), response.getData()));
+                ret.put(new ResponsePackage(ResponsePackage.Type.Error, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
             }
 
             @Override
             public void discard(Request request) {
-                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, 0));
+                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, 0, request.getSequenceNumber()));
             }
 
             @Override
@@ -352,11 +346,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
 
         return ret;
-    }
-
-    @Override
-    public FutureResponse sendRequestGetFuture(InetAddress address, int port, String data) {
-        return sendRequestGetFuture(address, port, data.getBytes(), DISCARD_TIME_MS, 0);
     }
 
     @Override

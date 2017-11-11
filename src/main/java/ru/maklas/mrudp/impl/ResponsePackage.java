@@ -10,15 +10,18 @@ public class ResponsePackage {
     private Type type;
     private byte[] data;
     private int responseCode;
+    private int sequenceNumber = 0;
 
-    public ResponsePackage(Type type, int responseCode, byte[] data) {
+    public ResponsePackage(Type type, int responseCode, byte[] data, int sequenceNumber) {
         this.type = type;
         this.data = data;
         this.responseCode = responseCode;
+        this.sequenceNumber = sequenceNumber;
     }
 
-    public ResponsePackage(Type type, int responseCode) {
+    public ResponsePackage(Type type, int responseCode, int sequenceNumber) {
         this.type = type;
+        this.sequenceNumber = sequenceNumber;
         this.data = new byte[0];
         this.responseCode = responseCode;
     }
@@ -39,10 +42,16 @@ public class ResponsePackage {
         return responseCode;
     }
 
+    public int getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+
     @Override
     public String toString() {
         return "ResponsePackage{" +
-                "type=" + type +
+                "sequenceNumber=" + sequenceNumber +
+                ", type=" + type +
                 ", code=" + responseCode +
                 (data.length == 0 ? "":", data=" + new String(data)) +
                 '}';

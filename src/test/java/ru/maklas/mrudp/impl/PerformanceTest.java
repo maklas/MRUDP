@@ -92,7 +92,7 @@ public class PerformanceTest {
     public void memoryLeakTest() throws Exception {
         final int port = 3001;
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, MRUDPSocketImpl.DEFAULT_WORKERS, MRUDPSocketImpl.DEFAULT_UPDATE_CD, 700);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, MRUDPSocketImpl.DEFAULT_WORKERS, MRUDPSocketImpl.DEFAULT_UPDATE_CD, MRUDPSocketImpl.DELETE_RESPONSES_MS);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -123,7 +123,8 @@ public class PerformanceTest {
         SimpleProfiler.start();
         for (int i = 0; i < packets; i++) {
             clientSocket.sendRequest(localhost, port, data);
-            if (i % 35000 == 0){
+            Thread.sleep(0);
+            if (i % 120 == 0){
                 float memoryMB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())/((float)1024 * 1024);
                 if(maxMemory < memoryMB){
                     maxMemory = memoryMB;

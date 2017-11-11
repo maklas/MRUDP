@@ -24,13 +24,9 @@ public interface MRUDPSocket {
 
     FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, int resendTries);
 
-    FutureResponse sendRequestGetFuture(InetAddress address, int port, String data);
-
     void resendRequest(Request request, ResponseHandler handler);
 
     void killConnection();
-
-    void setResponseTimeout(int ms);
 
     int getLocalPort();
 

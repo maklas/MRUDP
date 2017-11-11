@@ -40,12 +40,12 @@ public class ResponseMap {
 
 
     private ArrayList<ResponseIdentifier> keysToDelete = new ArrayList<ResponseIdentifier>();
-    public void update(){
+    public void cleanup(int deletionDelay){
         long currentTime = System.currentTimeMillis();
         synchronized (mutex){
             Set<Map.Entry<ResponseIdentifier, AnsweredResponse>> entries = map.entrySet();
             for (Map.Entry<ResponseIdentifier, AnsweredResponse> entry : entries) {
-                if (currentTime - entry.getValue().creationTime > deleteDelay){
+                if (currentTime - entry.getValue().creationTime > deletionDelay){
                     keysToDelete.add(entry.getKey());
                 }
             }
@@ -62,6 +62,17 @@ public class ResponseMap {
         }
 
         keysToDelete.clear();
+    }
+
+    public void update(){
+        cleanup(deleteDelay);
+    }
+
+    /**
+     * Удаляет все ответы которые пробыли в памяти дольше чем minTime
+     */
+    public void deleteOld(int minTime){
+        cleanup(minTime);
     }
 
 
