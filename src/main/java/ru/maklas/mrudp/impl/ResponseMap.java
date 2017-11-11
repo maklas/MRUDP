@@ -35,6 +35,9 @@ public class ResponseMap {
         synchronized (mutex){
             r = map.get(id);
         }
+        if (r == null){
+            return null;
+        }
         return r.response;
     }
 

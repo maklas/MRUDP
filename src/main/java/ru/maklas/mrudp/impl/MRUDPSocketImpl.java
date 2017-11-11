@@ -289,8 +289,8 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
 
     @Override
-    public void sendRequest(InetAddress address, int port, String data, int discardTime, ResponseHandler handler) {
-        sendRequest(address, port, data.getBytes(), discardTime, handler);
+    public void sendRequest(InetAddress address, int port, String data, int responseTimeOut, ResponseHandler handler) {
+        sendRequest(address, port, data.getBytes(), responseTimeOut, handler);
     }
 
     @Override
@@ -299,9 +299,9 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     }
 
     @Override
-    public void sendRequest(InetAddress address, int port, byte[] data, int discardTime, ResponseHandler handler){
+    public void sendRequest(InetAddress address, int port, byte[] data, int responseTimeOut, ResponseHandler handler){
         boolean handlerExists = handler != null;
-        RequestWriter request = new RequestImpl(seq, address, port, data, handlerExists, false, discardTime);
+        RequestWriter request = new RequestImpl(seq, address, port, data, handlerExists, false, responseTimeOut);
 
         if (handlerExists) {
             synchronized (requestHashMap) {
