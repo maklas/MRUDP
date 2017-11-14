@@ -4,6 +4,7 @@ import ru.maklas.mrudp.Response;
 
 import java.net.InetAddress;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ResponseMap {
 
@@ -34,17 +35,20 @@ public class ResponseMap {
         synchronized (mutex){
             r = map.get(id);
         }
+        if (r == null){
+            return null;
+        }
         return r.response;
     }
 
 
     private ArrayList<ResponseIdentifier> keysToDelete = new ArrayList<ResponseIdentifier>();
-    public void update(){
+    public void cleanup(int deletionDelay){
         long currentTime = System.currentTimeMillis();
         synchronized (mutex){
             Set<Map.Entry<ResponseIdentifier, AnsweredResponse>> entries = map.entrySet();
             for (Map.Entry<ResponseIdentifier, AnsweredResponse> entry : entries) {
-                if (currentTime - entry.getValue().creationTime > deleteDelay){
+                if (currentTime - entry.getValue().creationTime > deletionDelay){
                     keysToDelete.add(entry.getKey());
                 }
             }
@@ -61,6 +65,17 @@ public class ResponseMap {
         }
 
         keysToDelete.clear();
+    }
+
+    public void update(){
+        cleanup(deleteDelay);
+    }
+
+    /**
+     * Удаляет все ответы которые пробыли в памяти дольше чем minTime
+     */
+    public void deleteOld(int minTime){
+        cleanup(minTime);
     }
 
 

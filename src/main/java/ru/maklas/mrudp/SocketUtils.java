@@ -50,4 +50,16 @@ public class SocketUtils {
     public static boolean isRequestType(int type) {
         return type == REQUEST_TYPE;
     }
+
+
+    public static int intFromByteArray(byte[] bytes, int startOffset) {
+        return bytes[startOffset] << 24 | (bytes[1 + startOffset] & 0xFF) << 16 | (bytes[2 + startOffset] & 0xFF) << 8 | (bytes[3 + startOffset] & 0xFF);
+    }
+
+    public static void putInt(int value, byte[] target, int startOffset){
+        target[    startOffset] = (byte) (value >>> 24);
+        target[1 + startOffset] = (byte) (value >>> 16);
+        target[2 + startOffset] = (byte) (value >>> 8);
+        target[3 + startOffset] = (byte)  value;
+    }
 }

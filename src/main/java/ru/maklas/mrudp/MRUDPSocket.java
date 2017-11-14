@@ -14,23 +14,19 @@ public interface MRUDPSocket {
 
     void setProcessor(RequestProcessor processor);
 
-    void sendRequest(InetAddress address, int port, byte[] data, int discardTime, ResponseHandler handler);
+    void sendRequest(InetAddress address, int port, byte[] data, int responseTimeOut, ResponseHandler handler);
 
     void sendRequest(InetAddress address, int port, byte[] data);
 
-    void sendRequest(InetAddress address, int port, String data, int discardTime, ResponseHandler handler);
+    void sendRequest(InetAddress address, int port, String data, int responseTimeOut, ResponseHandler handler);
 
     void sendRequest(InetAddress address, int port, String data);
 
-    FutureResponse sendRequestGetFuture(InetAddress address, int port, int discardTime, int resendTries, byte[] data);
-
-    FutureResponse sendRequestGetFuture(InetAddress address, int port, String data);
+    FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, int resendTries);
 
     void resendRequest(Request request, ResponseHandler handler);
 
     void killConnection();
-
-    void setResponseTimeout(int ms);
 
     int getLocalPort();
 

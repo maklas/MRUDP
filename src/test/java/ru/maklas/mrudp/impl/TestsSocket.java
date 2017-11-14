@@ -50,12 +50,14 @@ public class TestsSocket {
         int code = 1023123;
         byte[] data = new byte[]{1, 2, 3, 4, 5, 6, 7, 8};
         final FutureResponse response = new FutureResponse();
-        ResponsePackage pack = new ResponsePackage(type, code, data);
+        final int seq = 1092413412;
+        ResponsePackage pack = new ResponsePackage(type, code, data, seq);
         response.put(pack);
         ResponsePackage responsePackage = response.get();
         assertEquals(responsePackage.getType(), type);
         assertEquals(responsePackage.getResponseCode(), code);
         assertEquals(responsePackage.getData(), data);
+        assertEquals(responsePackage.getSequenceNumber(), seq);
     }
 
     @Test(timeout = 10000)
@@ -63,8 +65,9 @@ public class TestsSocket {
         final int waitTime = 5000;
         final ResponsePackage.Type type = ResponsePackage.Type.Ok;
         final int code = 125323;
+        final int seq = 2412343;
         byte[] data = new byte[]{8, 7, 6, 5, 4, 3, 2, 1};
-        final ResponsePackage pack = new ResponsePackage(type, code, data);
+        final ResponsePackage pack = new ResponsePackage(type, code, data, seq);
 
         final FutureResponse response = new FutureResponse();
         Thread thread = new Thread(new Runnable() {
@@ -86,6 +89,7 @@ public class TestsSocket {
         assertEquals(responsePackage.getType(), type);
         assertEquals(responsePackage.getResponseCode(), code);
         assertEquals(responsePackage.getData(), data);
+        assertEquals(responsePackage.getSequenceNumber(), seq);
     }
 
     @Test
@@ -98,7 +102,7 @@ public class TestsSocket {
             @Override
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean ok = request.getDataAsString().equals("1");
-                future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, 0));
+                future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, 0, 0));
             }
         });
         clientSocket.sendRequest(localhost, port, "1");
@@ -109,7 +113,7 @@ public class TestsSocket {
             Thread.sleep(10);
             long difference = System.currentTimeMillis() - before;
             if (difference > maxTimeToWait){
-                future.put(new ResponsePackage(ResponsePackage.Type.Error, -1));
+                future.put(new ResponsePackage(ResponsePackage.Type.Error, -1, 0));
             }
         }
 
@@ -175,9 +179,9 @@ public class TestsSocket {
         });
 
         long before = System.currentTimeMillis();
-        clientSocket.sendRequestGetFuture(localhost, port, discardTime, 1, "123".getBytes()).get();
+        clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
-        System.out.println("Time took: " + (after - before));
+        assertEquals(1500, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
 
@@ -205,7 +209,7 @@ public class TestsSocket {
             clientSocket.sendRequest(localhost, port, testData.getBytes());
         }
 
-        Thread.sleep(3000);
+        Thread.sleep(4000);
         assertEquals(successCounter.get(), timesToSend);
     }
 
@@ -235,7 +239,7 @@ public class TestsSocket {
                 success.set(true);
             }
         });
-        clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), 1500, 0, data).get();
+        clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), data, 1500, 0).get();
         assertEquals("wtf: " + size, success.get(), true);
     }
 
@@ -257,7 +261,7 @@ public class TestsSocket {
         long before = System.currentTimeMillis();
 
         for (int i = 0; i < times; i++) {
-            ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, Integer.toString(i)).get();
+            ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, Integer.toString(i).getBytes(), 500, 0).get();
             int parsed = Integer.parseInt(responsePackage.getDataAsString());
             if (parsed != i){
                 throw new Exception("Expected " + i + ", but got " + parsed);
@@ -265,7 +269,7 @@ public class TestsSocket {
         }
 
         long after = System.currentTimeMillis();
-        System.out.println("Time took: " + (after - before));
+        System.out.println("Sequential data transmission for " + times + " packets took: " + (after - before) + " ms.");
     }
 
     @Test
