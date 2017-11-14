@@ -228,7 +228,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                                     response.setProcessing(false);
                                 }
                             } catch (Exception e) {
-                                log("exception while processing request: " + e.getClass().getSimpleName() +
+                                log("Exception while processing request: " + e.getClass().getSimpleName() +
                                 ".\n" + "Request=" + request.getDataAsString() + "\n" +
                                 "Response=" + response);
                                 log(e);
@@ -248,20 +248,25 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         final Request oldRequest = requestMemory.request;
                         final ResponseHandler handler = requestMemory.handler;
                         final Response response = new ResponseImpl(seq, address, port, msgCode, data);
-                        if (!SocketUtils.isAnErrorCode(msgCode))
-                            service.execute(new Runnable() {
+                        Runnable action;
+
+                        if (!SocketUtils.isAnErrorCode(msgCode)){
+                            action = new Runnable() {
                                 @Override
                                 public void run() {
                                     handler.handle(oldRequest, response);
                                 }
-                            });
-                        else
-                            service.execute(new Runnable() {
+                            };
+                        } else {
+                            action = new Runnable() {
                                 @Override
                                 public void run() {
                                     handler.handleError(oldRequest, response, msgCode);
                                 }
-                            });
+                            };
+                        }
+                        service.execute(action);
+
                     } else {
                         log("No saved request for packet '" + new String(fullData) + "'");
                     }
@@ -269,13 +274,15 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
 
             } catch (SocketException se) {
-                //log("Got bad msg. Quitting");
+                log("Got SocketException in receiving thread. Quitting...");
                 break;
             } catch (IOException e){
                 log("IOE in receiving thread");
             }
 
         }
+
+        log("Receiving thread has stopped!");
     }
 
 
