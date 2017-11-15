@@ -28,7 +28,6 @@
             <plugin>  <!-- Is used to generate sources on jitpack.io -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>

@@ -18,14 +18,15 @@ public class DelayedRequestProcessor implements RequestProcessor {
     }
 
     @Override
-    public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+    public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+        DelayedRequest delayedRequest = new DelayedRequest(request, response, responseRequired);
         try {
-            DelayedRequest delayedRequest = new DelayedRequest(request, response, responseRequired);
             queue.offer(delayedRequest);
             delayedRequest.assertResponse(responseTimeOut);
         } catch (InterruptedException e) {
             response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
         }
+        return delayedRequest.willSendResponse();
     }
 
 

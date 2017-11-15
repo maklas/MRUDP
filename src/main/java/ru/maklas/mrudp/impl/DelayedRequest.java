@@ -10,15 +10,18 @@ public class DelayedRequest implements Request {
 
     private final Request request;
     private final ResponseWriter response;
-
+    private volatile boolean sendResponse;
 
     private boolean responseRequired;
     private volatile boolean inserted = false;
+
 
     public DelayedRequest(Request request, ResponseWriter response, boolean responseRequired) {
         this.request = request;
         this.response = response;
         this.responseRequired = responseRequired;
+        this.sendResponse = responseRequired;
+
     }
 
     public synchronized void responseWithOk(byte[] data){
@@ -105,6 +108,14 @@ public class DelayedRequest implements Request {
 
     public boolean isResponseRequired() {
         return responseRequired;
+    }
+
+    public boolean willSendResponse() {
+        return sendResponse;
+    }
+
+    public void setSendResponse(boolean sendResponse) {
+        this.sendResponse = sendResponse;
     }
 
     @Override

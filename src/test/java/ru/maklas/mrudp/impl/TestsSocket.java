@@ -99,9 +99,10 @@ public class TestsSocket {
         final FutureResponse future = new FutureResponse();
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean ok = request.getDataAsString().equals("1");
                 future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, 0, 0));
+                return true;
             }
         });
         clientSocket.sendRequest(localhost, port, "1");
@@ -165,7 +166,7 @@ public class TestsSocket {
         serverSocket.setProcessor(new RequestProcessor() {
             private volatile boolean first = true;
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 totalRequestsReceived.incrementAndGet();
                 if (first){
                     Thread.sleep((int)(discardTime * 1.5f));
@@ -173,7 +174,7 @@ public class TestsSocket {
                 if (first){
                     first = false;
                 }
-
+                return true;
             }
         });
 
@@ -196,11 +197,12 @@ public class TestsSocket {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 String requestData = request.getDataAsString();
                 if (testData.equals(requestData)){
                     successCounter.incrementAndGet();
                 }
+                return true;
             }
         });
 
@@ -208,7 +210,7 @@ public class TestsSocket {
             clientSocket.sendRequest(localhost, port, testData.getBytes());
         }
 
-        Thread.sleep(4000);
+        Thread.sleep(5000);
         assertEquals(successCounter.get(), timesToSend);
     }
 
@@ -232,17 +234,18 @@ public class TestsSocket {
         final AtomicBoolean success = new AtomicBoolean(false);
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean equals = Arrays.equals(data, request.getData());
                 assertEquals("Not equals: \n" + Arrays.toString(data) + " \nand \n" + Arrays.toString(request.getData()), true, equals);
                 success.set(true);
+                return true;
             }
         });
         clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), data, 1500, 0).get();
         assertEquals("wtf: " + size, success.get(), true);
     }
 
-    @Test
+    @Test(timeout = 4 * 60 * 1000)
     public void testSequentialDataTransmission() throws Exception {
         final int port = 3005;
         final int times = 10000;
@@ -251,8 +254,9 @@ public class TestsSocket {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 response.setData(request.getData());
+                return true;
             }
         });
 
@@ -281,7 +285,8 @@ public class TestsSocket {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                return true;
             }
         });
 

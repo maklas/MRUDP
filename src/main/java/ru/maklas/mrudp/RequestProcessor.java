@@ -12,7 +12,8 @@ public interface RequestProcessor {
      * Processes Request and Produces a Response
      * @param request data from client
      * @param response data for client
+     * @return <b>False</b> to not answer to the request
      */
-    void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception;
+    boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception;
 
 }

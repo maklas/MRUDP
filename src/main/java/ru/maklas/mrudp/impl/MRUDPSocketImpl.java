@@ -207,7 +207,8 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
                     final Request request = new RequestImpl(seq, address, port, data, needsResponse, alreadyBeenSend, -1);
                     final ResponseWriterImpl response = new ResponseWriterImpl(seq, address, port, SocketUtils.OK);
-                    responseMap.put(response);  /// --1
+                    if (needsResponse)
+                        responseMap.put(response);  /// --1
 
                     final RequestProcessor processor;
                     synchronized (processorMonitor){
@@ -217,12 +218,13 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         @Override
                         public void run() {
                             try {
-                                processor.process(request, response, needsResponse);
+                                boolean sendResponse = processor.process(request, response, needsResponse);
 
-                                if (needsResponse) {
+                                if (needsResponse && sendResponse){
                                     sendResponse(response);
-                                    response.setProcessing(false);
                                 }
+                                response.setProcessing(false);
+
                             } catch (Exception e) {
                                 log("Exception while processing request: " + e.getClass().getSimpleName() +
                                 ".\n" + "Request=" + request.getDataAsString() + "\n" +
@@ -471,8 +473,9 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     private class NullProcessor implements RequestProcessor {
         @Override
-        public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+        public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
             response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
+            return true;
         }
     }
 
