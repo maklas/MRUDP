@@ -7,7 +7,6 @@ import ru.maklas.mrudp.*;
 
 import java.net.InetAddress;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
@@ -347,4 +346,56 @@ public class TestsSocket {
         }
 
     }
+
+    @Test
+    public void delayedRequest() throws Exception {
+        final int port = 3006;
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MrudpLogger logger = new MrudpLogger() {
+            @Override
+            public void log(String msg) {
+                System.err.println(msg);
+            }
+
+            @Override
+            public void log(Exception e) {
+                e.printStackTrace();
+            }
+        };
+        serverSocket.setLogger(logger);
+        clientSocket.setLogger(logger);
+
+
+        DelayedRequestProcessor processor = new DelayedRequestProcessor(3000);
+        serverSocket.setProcessor(processor);
+
+
+        for (int i = 0; i < 10; i++) {
+            clientSocket.sendRequest(localhost, port, "Hello " + i, 2000, new ResponseAdapter(){
+                @Override
+                public void handle(Request request, Response response) {
+                    System.out.println("handled: " + request.getDataAsString());
+                }
+
+                @Override
+                public int getTimesToResend() {
+                    return 2;
+                }
+            });
+        }
+
+        Thread.sleep(2300);
+
+        for (int i = 0; i < 10; i++) {
+            DelayedRequest take = processor.take();
+            System.out.println(take);
+            take.responseEmpty();
+        }
+
+        Thread.sleep(500);
+
+    }
+
+
 }

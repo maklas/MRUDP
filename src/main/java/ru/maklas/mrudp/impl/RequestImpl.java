@@ -60,7 +60,8 @@ public class RequestImpl implements RequestWriter {
     @Override
     public String toString() {
         return "Request{" +
-                "address=" + address +
+                "seq=" + sequence +
+                ", address=" + address +
                 ":" + port +
                 ", data=" + (data == null ? "NO_DATA" : getDataAsString()) +
                 '}';
