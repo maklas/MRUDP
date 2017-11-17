@@ -7,10 +7,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -109,49 +106,34 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         updateThread.interrupt();
     }
 
-    private final ArrayList<Integer> requiresRemoval = new ArrayList<Integer>();
     private void update(){
-
         synchronized (requestHashMap){
-            Set<Map.Entry<Integer, MRUDPSocketImpl.RequestHandleWrap>> entries = requestHashMap.entrySet();
-            for (Map.Entry<Integer, MRUDPSocketImpl.RequestHandleWrap> entry : entries) {
-                MRUDPSocketImpl.RequestHandleWrap wrap = entry.getValue();
-                if (wrap.msSinceCreation() > wrap.request.getDiscardTime()){
-                    requiresRemoval.add(entry.getKey());
-                }
-            }
-        }
+            Iterator<Map.Entry<Integer, RequestHandleWrap>> iterator = requestHashMap.entrySet().iterator();
 
-        if (requiresRemoval.size() > 0){
-            for (Integer i:requiresRemoval) {
-                RequestHandleWrap triple;
-                synchronized (requestHashMap) {
-                    triple = requestHashMap.remove(i);
-                }
-                if (triple == null){
-                    continue;
-                }
+            while (iterator.hasNext()){
+                RequestHandleWrap triple = iterator.next().getValue();
                 final RequestWriter request = triple.request;
-                final ResponseHandler handler = triple.handler;
-                final int timesToResend = handler.getTimesToResend();
+                if (triple.msSinceCreation() > request.getDiscardTime()){
 
-                if (timesToResend > request.getTimesRequested()){
-                    request.incTimesRequested();
-                    resendRequest(request, handler);
-                    log("Retry for: " + request + " #" + request.getTimesRequested());
-                } else {
-                    service.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            handler.discard(request);
-                        }
-                    });
+                    final ResponseHandler handler = triple.handler;
+                    final int timesToResend = handler.getTimesToResend();
 
+                    if (timesToResend > request.getTimesRequested()){
+                        request.incTimesRequested();
+                        sendData(request.getAddress(), request.getPort(), request.getData(), SocketUtils.REQUEST_TYPE, request.getSequenceNumber(), true, true);
+                        log("Retry for: " + request + " #" + request.getTimesRequested());
+                    } else {
+                        iterator.remove();
+                        service.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                handler.discard(request);
+                            }
+                        });
+                    }
                 }
             }
-            requiresRemoval.clear();
         }
-
     }
 
 

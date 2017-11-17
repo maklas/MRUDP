@@ -131,22 +131,21 @@ public class TestsSocket {
         }
     }
 
-    @Test
+    @Test(timeout = 10 * 1000)
     public void testMassiveDiscard() throws Exception {
-        int times = 5000;
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
-        final AtomicInteger integer = new AtomicInteger(0);
+        final int times = 5000;
+        final MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        final CountDownLatch latch = new CountDownLatch(times);
         for (int i = 0; i < times; i++) {
             clientSocket.sendRequest(localhost, 1000, "100", 1500, new ResponseAdapter(){
                 @Override
                 public void discard(Request request) {
-                    integer.incrementAndGet();
+                    latch.countDown();
                 }
             });
         }
 
-        Thread.sleep(5000);
-        assertEquals(integer.get(), times);
+        latch.await();
     }
 
 
@@ -156,9 +155,7 @@ public class TestsSocket {
         final int discardTime = 1000;
 
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
-
-
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, 5, 15, 4000);
 
 
         final AtomicInteger totalRequestsReceived = new AtomicInteger(0);
@@ -169,28 +166,27 @@ public class TestsSocket {
                 totalRequestsReceived.incrementAndGet();
                 if (first){
                     Thread.sleep((int)(discardTime * 1.5f));
-                }
-                if (first){
                     first = false;
                 }
-
             }
         });
 
         long before = System.currentTimeMillis();
         clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
-        assertEquals(1500, after - before, 150);
+        System.out.println("expected: " + discardTime + ", got: " + (after - before));
+        assertEquals(discardTime, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
 
 
-    @Test
+    @Test(timeout = 20 * 1000)
     public void testSimpleDataTransmission() throws Exception {
+        Thread.sleep(5000);
         final String testData = "{ \"name\":\"John\", \"age\":30, \"car\":null }";
         final int port = 3003;
-        final int timesToSend = 20000;
-        final AtomicInteger successCounter = new AtomicInteger(0);
+        final int timesToSend = 15000;
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
         MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
 
@@ -199,7 +195,7 @@ public class TestsSocket {
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 String requestData = request.getDataAsString();
                 if (testData.equals(requestData)){
-                    successCounter.incrementAndGet();
+                    latch.countDown();
                 }
             }
         });
@@ -207,11 +203,8 @@ public class TestsSocket {
         for (int i = 0; i < timesToSend; i++) {
             clientSocket.sendRequest(localhost, port, testData.getBytes());
         }
-
-        Thread.sleep(4000);
-        assertEquals(successCounter.get(), timesToSend);
+        latch.await();
     }
-
 
     @Test
     public void sizeTest() throws Exception {
@@ -245,7 +238,7 @@ public class TestsSocket {
     @Test
     public void testSequentialDataTransmission() throws Exception {
         final int port = 3005;
-        final int times = 10000;
+        final int times = 100000;
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), 4096);
         MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), 4096);
 

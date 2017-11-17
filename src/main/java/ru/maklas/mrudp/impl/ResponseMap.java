@@ -41,30 +41,18 @@ public class ResponseMap {
         return r.response;
     }
 
-
-    private ArrayList<ResponseIdentifier> keysToDelete = new ArrayList<ResponseIdentifier>();
     public void cleanup(int deletionDelay){
         long currentTime = System.currentTimeMillis();
         synchronized (mutex){
-            Set<Map.Entry<ResponseIdentifier, AnsweredResponse>> entries = map.entrySet();
-            for (Map.Entry<ResponseIdentifier, AnsweredResponse> entry : entries) {
-                if (currentTime - entry.getValue().creationTime > deletionDelay){
-                    keysToDelete.add(entry.getKey());
+            Iterator<Map.Entry<ResponseIdentifier, AnsweredResponse>> iterator = map.entrySet().iterator();
+
+            while (iterator.hasNext()){
+                Map.Entry<ResponseIdentifier, AnsweredResponse> next = iterator.next();
+                if (currentTime - next.getValue().creationTime > deletionDelay){
+                    iterator.remove();
                 }
             }
         }
-
-        if (keysToDelete.size() == 0){
-            return;
-        }
-
-        synchronized (mutex){
-            for (ResponseIdentifier responseIdentifier : keysToDelete) {
-                map.remove(responseIdentifier);
-            }
-        }
-
-        keysToDelete.clear();
     }
 
     public void update(){
