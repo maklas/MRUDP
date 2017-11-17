@@ -25,21 +25,15 @@ public class DelayedRequest implements Request {
     }
 
     public synchronized void responseWithOk(byte[] data){
-        if (inserted){
-            throw new RuntimeException("Can't put data twice");
-        }
-        response.setData(data);
-        response.setResponseCode(SocketUtils.OK);
-        inserted = true;
-        notify();
+        responseWithCode(SocketUtils.OK, data);
     }
 
-    public synchronized void responseWithError(int errorCode, byte[] data){
+    public synchronized void responseWithCode(int code, byte[] data){
         if (inserted){
             throw new RuntimeException("Can't put data twice");
         }
         response.setData(data);
-        response.setResponseCode(errorCode);
+        response.setResponseCode(code);
         inserted = true;
         notify();
     }

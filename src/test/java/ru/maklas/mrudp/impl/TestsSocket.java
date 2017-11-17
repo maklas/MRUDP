@@ -26,6 +26,7 @@ public class TestsSocket {
         localhost = InetAddress.getLocalHost();
     }
 
+
     @Test(expected = TimeoutException.class)
     public void testFutureBlock() throws Exception {
         final FutureResponse response = new FutureResponse();
@@ -99,10 +100,9 @@ public class TestsSocket {
         final FutureResponse future = new FutureResponse();
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean ok = request.getDataAsString().equals("1");
                 future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, 0, 0));
-                return true;
             }
         });
         clientSocket.sendRequest(localhost, port, "1");
@@ -132,22 +132,21 @@ public class TestsSocket {
         }
     }
 
-    @Test
+    @Test(timeout = 10 * 1000)
     public void testMassiveDiscard() throws Exception {
-        int times = 5000;
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
-        final AtomicInteger integer = new AtomicInteger(0);
+        final int times = 5000;
+        final MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        final CountDownLatch latch = new CountDownLatch(times);
         for (int i = 0; i < times; i++) {
             clientSocket.sendRequest(localhost, 1000, "100", 1500, new ResponseAdapter(){
                 @Override
                 public void discard(Request request) {
-                    integer.incrementAndGet();
+                    latch.countDown();
                 }
             });
         }
 
-        Thread.sleep(5000);
-        assertEquals(integer.get(), times);
+        latch.await();
     }
 
 
@@ -157,61 +156,88 @@ public class TestsSocket {
         final int discardTime = 1000;
 
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
-
-
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, 5, 15, 4000);
 
 
         final AtomicInteger totalRequestsReceived = new AtomicInteger(0);
         serverSocket.setProcessor(new RequestProcessor() {
             private volatile boolean first = true;
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 totalRequestsReceived.incrementAndGet();
                 if (first){
                     Thread.sleep((int)(discardTime * 1.5f));
-                }
-                if (first){
                     first = false;
                 }
-                return true;
             }
         });
 
         long before = System.currentTimeMillis();
         clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
-        assertEquals(1500, after - before, 150);
+        System.out.println("expected: " + discardTime + ", got: " + (after - before));
+        assertEquals(discardTime, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
 
 
-    @Test
+    @Test(timeout = 20 * 1000)
     public void testSimpleDataTransmission() throws Exception {
         final String testData = "{ \"name\":\"John\", \"age\":30, \"car\":null }";
         final int port = 3003;
-        final int timesToSend = 20000;
-        final AtomicInteger successCounter = new AtomicInteger(0);
+        final int timesToSend = 15000;
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
         MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 String requestData = request.getDataAsString();
                 if (testData.equals(requestData)){
-                    successCounter.incrementAndGet();
+                    latch.countDown();
                 }
-                return true;
             }
         });
 
         for (int i = 0; i < timesToSend; i++) {
             clientSocket.sendRequest(localhost, port, testData.getBytes());
         }
+        latch.await();
+    }
 
-        Thread.sleep(5000);
-        assertEquals(successCounter.get(), timesToSend);
+
+    @Test(timeout = 20 * 1000)
+    public void testSimpleDataTransmissionOnRouter() throws Exception {
+        final String testData = "{ \"name\":\"John\", \"age\":30, \"car\":null }";
+        final int port = 3003;
+        final int timesToSend = 1000000;
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
+
+        Router router = new RouterImpl();
+        UDPSocket serverUDP = router.getNewConnection(port);
+        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
+        UDPSocket clientUDP = router.getNewConnection();
+
+        System.out.println("Server address: " + localhost);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize);
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                String requestData = request.getDataAsString();
+                if (testData.equals(requestData)){
+                    latch.countDown();
+                }
+            }
+        });
+
+        for (int i = 0; i < timesToSend; i++) {
+            clientSocket.sendRequest(localhost, port, testData.getBytes());
+        }
+        latch.await();
     }
 
 
@@ -234,29 +260,27 @@ public class TestsSocket {
         final AtomicBoolean success = new AtomicBoolean(false);
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean equals = Arrays.equals(data, request.getData());
                 assertEquals("Not equals: \n" + Arrays.toString(data) + " \nand \n" + Arrays.toString(request.getData()), true, equals);
                 success.set(true);
-                return true;
             }
         });
         clientSocket.sendRequestGetFuture(localhost, serverSocket.getLocalPort(), data, 1500, 0).get();
         assertEquals("wtf: " + size, success.get(), true);
     }
 
-    @Test(timeout = 4 * 60 * 1000)
+    @Test
     public void testSequentialDataTransmission() throws Exception {
         final int port = 3005;
-        final int times = 10000;
+        final int times = 100000;
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), 4096);
         MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), 4096);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 response.setData(request.getData());
-                return true;
             }
         });
 
@@ -285,8 +309,7 @@ public class TestsSocket {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
-                return true;
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
             }
         });
 
@@ -402,5 +425,68 @@ public class TestsSocket {
 
     }
 
+    @Test
+    public void laggyRouterTest() throws Exception {
+        final String testData = "{\"name\":\"John\", \"age\":30, \"car\":null}";
+        final int port = 3003;
+        final int timesToSend = 100000;
+        final float loseChance = 50f;
+        final int responseTimeOut = 100;
+        final int retries = 50;
 
+
+        final AtomicInteger success = new AtomicInteger(0);
+        final AtomicInteger failure = new AtomicInteger(0);
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
+
+        Router router = new LaggyRouter(loseChance);
+        System.err.println("If chance of losing a packet = " + loseChance + "% and total tries = " + (retries + 1) + ", then ");
+        System.err.println("Success chance = " + ((LaggyRouter) router).getSuccessChance(retries + 1) + "%");
+        UDPSocket serverUDP = router.getNewConnection(port);
+        UDPSocket clientUDP = router.getNewConnection();
+        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
+
+        System.out.println("Server address: " + localhost);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize, true, 150, 75, 30000);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize, true, 150, 75, 2000);
+
+        final AtomicInteger counter = new AtomicInteger();
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                counter.incrementAndGet();
+            }
+        });
+
+
+        Thread.sleep(50);
+        for (int i = 0; i < timesToSend; i++) {
+            clientSocket.sendRequest(localhost, port, testData + " " + i, responseTimeOut, new ResponseAdapter(){
+                @Override
+                public void handle(Request request, Response response) {
+                    success.incrementAndGet();
+                    latch.countDown();
+                }
+
+                @Override
+                public void discard(Request request) {
+                    failure.incrementAndGet();
+                    latch.countDown();
+                }
+
+                @Override
+                public int getTimesToResend() {
+                    return retries;
+                }
+            });
+        }
+
+        latch.await();
+        System.err.println("Handled: " + success.get() + ", Discarded: " + failure.get());
+        System.err.println("Server counted " + counter.get() + " requests");
+        assertEquals(timesToSend, success.get(), 5);
+        assertEquals(timesToSend, counter.get(), 5);
+
+    }
 }
