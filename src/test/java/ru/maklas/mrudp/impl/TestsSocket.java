@@ -176,7 +176,7 @@ public class TestsSocket {
         long before = System.currentTimeMillis();
         clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
-        System.out.println("expected: " + discardTime + ", got: " + (after - before));
+        System.out.println("expected: " + firstRequestSleepTime + ", got: " + (after - before));
         assertEquals(firstRequestSleepTime, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
@@ -473,7 +473,7 @@ public class TestsSocket {
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 if (request.getAddress().equals(localhost)){
                     System.out.println("localhost detected. Denying in response");
-                    response.sendResponse(false);
+                    response.setSendResponse(false);
                 }
             }
         });
