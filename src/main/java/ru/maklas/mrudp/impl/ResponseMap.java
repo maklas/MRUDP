@@ -18,10 +18,6 @@ public class ResponseMap {
         mutex = this;
     }
 
-
-
-
-
     public void put(ResponseWriterImpl response){
         AnsweredResponse answeredResponse = new AnsweredResponse(response);
         synchronized (mutex){
@@ -40,7 +36,6 @@ public class ResponseMap {
         }
         return r.response;
     }
-
 
     private ArrayList<ResponseIdentifier> keysToDelete = new ArrayList<ResponseIdentifier>();
     public void cleanup(int deletionDelay){
