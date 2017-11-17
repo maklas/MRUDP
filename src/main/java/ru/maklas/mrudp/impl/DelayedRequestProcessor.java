@@ -26,7 +26,7 @@ public class DelayedRequestProcessor implements RequestProcessor {
         } catch (InterruptedException e) {
             response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
         }
-        // TODO replace with response.send(true/false); //return delayedRequest.willSendResponse();
+        response.setSendResponse(delayedRequest.willSendResponse());
     }
 
 

@@ -24,6 +24,7 @@ public interface ResponseWriter extends AddressContainer, Response {
     void setResponseCode(int responseCode);
 
 
+    void setSendResponse(boolean send);
 
-
+    boolean willSendResponse();
 }

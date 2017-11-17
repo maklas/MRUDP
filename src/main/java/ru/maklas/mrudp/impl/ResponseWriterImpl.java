@@ -15,6 +15,7 @@ import java.util.Arrays;
 public class ResponseWriterImpl extends ResponseImpl implements ResponseWriter {
 
     private volatile boolean processing = true;
+    private boolean sendResponse = true;
 
     ResponseWriterImpl(int sequenceNumber, InetAddress address, int port, int responseCode) {
         super(sequenceNumber, address, port, responseCode, new byte[0]);
@@ -38,6 +39,16 @@ public class ResponseWriterImpl extends ResponseImpl implements ResponseWriter {
         if (data != null) {
             setData(data.getBytes());
         }
+    }
+
+    @Override
+    public void setSendResponse(boolean send) {
+        this.sendResponse = send;
+    }
+
+    @Override
+    public boolean willSendResponse() {
+        return sendResponse;
     }
 
     @Override

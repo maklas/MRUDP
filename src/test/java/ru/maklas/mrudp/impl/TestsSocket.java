@@ -461,4 +461,25 @@ public class TestsSocket {
         assertEquals(timesToSend, counter.get(), 5);
 
     }
+
+    @Test
+    public void testNoResponse() throws Exception {
+        final int port = 3007;
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                if (request.getAddress().equals(localhost)){
+                    System.out.println("localhost detected. Denying in response");
+                    response.sendResponse(false);
+                }
+            }
+        });
+
+        ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, new byte[]{0}, 1000, 1).get();
+        assertEquals(ResponsePackage.Type.Discarded, responsePackage.getType());
+        assertEquals(SocketUtils.DISCARDED, responsePackage.getResponseCode());
+    }
 }

@@ -180,7 +180,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                     if (alreadyBeenSend && needsResponse) {
                         ResponseWriterImpl alreadyAnsweredResponse = responseMap.get(address, port, seq);
                         if (alreadyAnsweredResponse != null){
-                            if (!alreadyAnsweredResponse.isProcessing()) {
+                            if (!alreadyAnsweredResponse.isProcessing() && alreadyAnsweredResponse.willSendResponse()) {
                                 sendResponse(alreadyAnsweredResponse);
                             }
                             continue;
@@ -202,7 +202,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                             try {
                                 processor.process(request, response, needsResponse);
 
-                                if (needsResponse) {
+                                if (needsResponse && response.willSendResponse()) {
                                     sendResponse(response);
                                 }
                                 response.setProcessing(false);
