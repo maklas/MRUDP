@@ -154,6 +154,7 @@ public class TestsSocket {
     public void testResend() throws Exception {
         final int port = 3002;
         final int discardTime = 1000;
+        final int firstRequestSleepTime = (int) (discardTime * 1.5f);
 
         MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
         MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, 5, 15, 4000);
@@ -166,7 +167,7 @@ public class TestsSocket {
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 totalRequestsReceived.incrementAndGet();
                 if (first){
-                    Thread.sleep((int)(discardTime * 1.5f));
+                    Thread.sleep(firstRequestSleepTime);
                     first = false;
                 }
             }
@@ -176,7 +177,7 @@ public class TestsSocket {
         clientSocket.sendRequestGetFuture(localhost, port, "123".getBytes(), discardTime, 1).get();
         long after = System.currentTimeMillis();
         System.out.println("expected: " + discardTime + ", got: " + (after - before));
-        assertEquals(discardTime, after - before, 150);
+        assertEquals(firstRequestSleepTime, after - before, 150);
         assertEquals(1, totalRequestsReceived.get());
     }
 
@@ -298,35 +299,6 @@ public class TestsSocket {
         long after = System.currentTimeMillis();
         System.out.println("Sequential data transmission for " + times + " packets took: " + (after - before) + " ms.");
     }
-
-    @Test
-    @Ignore
-    public void ddos() throws Exception {
-        final int port = 3005;
-        final int times = 20;
-        final int threads = 100;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-
-        serverSocket.setProcessor(new RequestProcessor() {
-            @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
-            }
-        });
-
-        ExecutorService executorService = Executors.newFixedThreadPool(threads);
-        Sender[] senders = new Sender[threads];
-        for (int i = 0; i < threads; i++) {
-            senders[i] = new Sender(port, new MRUDPSocketImpl(new JavaUDPSocket(), 50), bufferSize, times);
-        }
-
-        List<Future<Integer>> futures = executorService.invokeAll(Arrays.asList(senders));
-        for (Future<Integer> future : futures) {
-            Integer integer = future.get();
-            assertEquals(integer, Integer.valueOf(times));
-        }
-
-    }
-
 
     private class Sender implements Callable<Integer> {
 

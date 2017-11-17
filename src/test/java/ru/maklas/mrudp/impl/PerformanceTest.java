@@ -33,9 +33,8 @@ public class PerformanceTest {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 response.setData(request.getData());
-                return true;
             }
         });
 
@@ -93,8 +92,8 @@ public class PerformanceTest {
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
-            public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
-                return true;
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+
             }
         });
         serverSocket.setLogger(new MrudpLogger() {

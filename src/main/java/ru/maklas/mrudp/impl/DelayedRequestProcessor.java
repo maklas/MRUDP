@@ -18,7 +18,7 @@ public class DelayedRequestProcessor implements RequestProcessor {
     }
 
     @Override
-    public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+    public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
         DelayedRequest delayedRequest = new DelayedRequest(request, response, responseRequired);
         try {
             queue.offer(delayedRequest);
@@ -26,7 +26,7 @@ public class DelayedRequestProcessor implements RequestProcessor {
         } catch (InterruptedException e) {
             response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
         }
-        return delayedRequest.willSendResponse();
+        // TODO replace with response.send(true/false); //return delayedRequest.willSendResponse();
     }
 
 

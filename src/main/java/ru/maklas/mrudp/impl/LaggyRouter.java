@@ -1,7 +1,5 @@
 package ru.maklas.mrudp.impl;
 
-import ru.maklas.mrudp.impl.RouterImpl;
-
 import java.util.Random;
 
 public class LaggyRouter extends RouterImpl {

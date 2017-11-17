@@ -200,9 +200,9 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         @Override
                         public void run() {
                             try {
-                                boolean sendResponse = processor.process(request, response, needsResponse);
+                                processor.process(request, response, needsResponse);
 
-                                if (needsResponse && sendResponse){
+                                if (needsResponse) {
                                     sendResponse(response);
                                 }
                                 response.setProcessing(false);
@@ -455,9 +455,8 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     private class NullProcessor implements RequestProcessor {
         @Override
-        public boolean process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+        public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
             response.setResponseCode(SocketUtils.INTERNAL_SERVER_ERROR);
-            return true;
         }
     }
 
