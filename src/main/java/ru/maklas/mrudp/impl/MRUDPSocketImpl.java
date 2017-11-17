@@ -182,7 +182,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         if (alreadyAnsweredResponse != null){
                             if (!alreadyAnsweredResponse.isProcessing()) {
                                 sendResponse(alreadyAnsweredResponse);
-                                //System.out.println("Double answering response: " + new String(alreadyAnsweredResponse.data));
                             }
                             continue;
                         }
