@@ -174,7 +174,6 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                 final byte[] data = getDataFrom(fullData,6, fullLength - 6);
 
                 if (isRequest) {
-
                     //HANDLING REQUEST
 
                     /// --1 (The whole if statement)
@@ -185,7 +184,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                                 sendResponse(alreadyAnsweredResponse);
                                 //System.out.println("Double answering response: " + new String(alreadyAnsweredResponse.data));
                             }
-                            return;
+                            continue;
                         }
                     }
 

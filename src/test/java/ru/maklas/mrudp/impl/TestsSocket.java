@@ -429,45 +429,40 @@ public class TestsSocket {
     public void laggyRouterTest() throws Exception {
         final String testData = "{\"name\":\"John\", \"age\":30, \"car\":null}";
         final int port = 3003;
-        final int timesToSend = 100;
+        final int timesToSend = 100000;
+        final float loseChance = 50f;
+        final int responseTimeOut = 100;
+        final int retries = 50;
 
-        Router router = new LaggyRouter();
-        UDPSocket serverUDP = router.getNewConnection(port);
-        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
-        UDPSocket clientUDP = router.getNewConnection();
-
-        System.out.println("Server address: " + localhost);
-
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize);
-
-        MrudpLogger logger = new MrudpLogger() {
-            @Override
-            public void log(String msg) {
-                System.err.println(msg);
-            }
-
-            @Override
-            public void log(Exception e) {
-                e.printStackTrace();
-            }
-        };
-        //serverSocket.setLogger(logger);
-        //clientSocket.setLogger(logger);
-
-        serverSocket.setProcessor(new RequestProcessor() {
-            @Override
-            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
-                response.setData(request.getData());
-            }
-        });
 
         final AtomicInteger success = new AtomicInteger(0);
         final AtomicInteger failure = new AtomicInteger(0);
         final CountDownLatch latch = new CountDownLatch(timesToSend);
 
+        Router router = new LaggyRouter(loseChance);
+        System.err.println("If chance of losing a packet = " + loseChance + "% and total tries = " + (retries + 1) + ", then ");
+        System.err.println("Success chance = " + ((LaggyRouter) router).getSuccessChance(retries + 1) + "%");
+        UDPSocket serverUDP = router.getNewConnection(port);
+        UDPSocket clientUDP = router.getNewConnection();
+        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
+
+        System.out.println("Server address: " + localhost);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize, true, 150, 75, 30000);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize, true, 150, 75, 2000);
+
+        final AtomicInteger counter = new AtomicInteger();
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                counter.incrementAndGet();
+            }
+        });
+
+
+        Thread.sleep(50);
         for (int i = 0; i < timesToSend; i++) {
-            clientSocket.sendRequest(localhost, port, testData + i, 1000, new ResponseAdapter(){
+            clientSocket.sendRequest(localhost, port, testData + " " + i, responseTimeOut, new ResponseAdapter(){
                 @Override
                 public void handle(Request request, Response response) {
                     success.incrementAndGet();
@@ -482,14 +477,16 @@ public class TestsSocket {
 
                 @Override
                 public int getTimesToResend() {
-                    return 1;
+                    return retries;
                 }
             });
         }
 
-
         latch.await();
         System.err.println("Handled: " + success.get() + ", Discarded: " + failure.get());
+        System.err.println("Server counted " + counter.get() + " requests");
+        assertEquals(timesToSend, success.get(), 5);
+        assertEquals(timesToSend, counter.get(), 5);
 
     }
 }
