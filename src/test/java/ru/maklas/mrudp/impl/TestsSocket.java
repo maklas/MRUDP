@@ -26,6 +26,7 @@ public class TestsSocket {
         localhost = InetAddress.getLocalHost();
     }
 
+
     @Test(expected = TimeoutException.class)
     public void testFutureBlock() throws Exception {
         final FutureResponse response = new FutureResponse();
@@ -182,7 +183,6 @@ public class TestsSocket {
 
     @Test(timeout = 20 * 1000)
     public void testSimpleDataTransmission() throws Exception {
-        Thread.sleep(5000);
         final String testData = "{ \"name\":\"John\", \"age\":30, \"car\":null }";
         final int port = 3003;
         final int timesToSend = 15000;
@@ -205,6 +205,41 @@ public class TestsSocket {
         }
         latch.await();
     }
+
+
+    @Test(timeout = 20 * 1000)
+    public void testSimpleDataTransmissionOnRouter() throws Exception {
+        final String testData = "{ \"name\":\"John\", \"age\":30, \"car\":null }";
+        final int port = 3003;
+        final int timesToSend = 1000000;
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
+
+        Router router = new RouterImpl();
+        UDPSocket serverUDP = router.getNewConnection(port);
+        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
+        UDPSocket clientUDP = router.getNewConnection();
+
+        System.out.println("Server address: " + localhost);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize);
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                String requestData = request.getDataAsString();
+                if (testData.equals(requestData)){
+                    latch.countDown();
+                }
+            }
+        });
+
+        for (int i = 0; i < timesToSend; i++) {
+            clientSocket.sendRequest(localhost, port, testData.getBytes());
+        }
+        latch.await();
+    }
+
 
     @Test
     public void sizeTest() throws Exception {
@@ -390,5 +425,71 @@ public class TestsSocket {
 
     }
 
+    @Test
+    public void laggyRouterTest() throws Exception {
+        final String testData = "{\"name\":\"John\", \"age\":30, \"car\":null}";
+        final int port = 3003;
+        final int timesToSend = 100;
 
+        Router router = new LaggyRouter();
+        UDPSocket serverUDP = router.getNewConnection(port);
+        InetAddress localhost = ((RouterImpl.RouterUDP) serverUDP).getAddress();
+        UDPSocket clientUDP = router.getNewConnection();
+
+        System.out.println("Server address: " + localhost);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize);
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize);
+
+        MrudpLogger logger = new MrudpLogger() {
+            @Override
+            public void log(String msg) {
+                System.err.println(msg);
+            }
+
+            @Override
+            public void log(Exception e) {
+                e.printStackTrace();
+            }
+        };
+        //serverSocket.setLogger(logger);
+        //clientSocket.setLogger(logger);
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                response.setData(request.getData());
+            }
+        });
+
+        final AtomicInteger success = new AtomicInteger(0);
+        final AtomicInteger failure = new AtomicInteger(0);
+        final CountDownLatch latch = new CountDownLatch(timesToSend);
+
+        for (int i = 0; i < timesToSend; i++) {
+            clientSocket.sendRequest(localhost, port, testData + i, 1000, new ResponseAdapter(){
+                @Override
+                public void handle(Request request, Response response) {
+                    success.incrementAndGet();
+                    latch.countDown();
+                }
+
+                @Override
+                public void discard(Request request) {
+                    failure.incrementAndGet();
+                    latch.countDown();
+                }
+
+                @Override
+                public int getTimesToResend() {
+                    return 1;
+                }
+            });
+        }
+
+
+        latch.await();
+        System.err.println("Handled: " + success.get() + ", Discarded: " + failure.get());
+
+    }
 }

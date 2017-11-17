@@ -116,9 +116,9 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                 if (triple.msSinceCreation() > request.getDiscardTime()){
 
                     final ResponseHandler handler = triple.handler;
-                    final int timesToResend = handler.getTimesToResend();
 
-                    if (timesToResend > request.getTimesRequested()){
+                    if (handler.getTimesToResend() > request.getTimesRequested()){
+                        triple.timeCreated = System.currentTimeMillis();
                         request.incTimesRequested();
                         sendData(request.getAddress(), request.getPort(), request.getData(), SocketUtils.REQUEST_TYPE, request.getSequenceNumber(), true, true);
                         log("Retry for: " + request + " #" + request.getTimesRequested());
@@ -181,8 +181,10 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                     if (alreadyBeenSend && needsResponse) {
                         ResponseWriterImpl alreadyAnsweredResponse = responseMap.get(address, port, seq);
                         if (alreadyAnsweredResponse != null){
-                            if (!alreadyAnsweredResponse.isProcessing())
+                            if (!alreadyAnsweredResponse.isProcessing()) {
                                 sendResponse(alreadyAnsweredResponse);
+                                //System.out.println("Double answering response: " + new String(alreadyAnsweredResponse.data));
+                            }
                             return;
                         }
                     }
@@ -436,7 +438,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     private static class RequestHandleWrap{
 
-        final long timeCreated;
+        long timeCreated;
         final RequestWriter request;
         final ResponseHandler handler;
 
