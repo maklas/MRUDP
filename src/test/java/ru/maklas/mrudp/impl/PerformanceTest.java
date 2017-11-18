@@ -61,7 +61,7 @@ public class PerformanceTest {
         final int packetsWithResponse = 50000;
         SimpleProfiler.start();
         for (int i = 0; i < packetsWithResponse; i++) {
-            clientSocket.sendRequest(localhost, port, data, 1000, new ResponseAdapter());
+            clientSocket.sendRequest(localhost, port, data, 1000, new ResponseHandlerAdapter());
         }
         double result2 = SimpleProfiler.getMS();
         System.out.println("packetsWithResponse: (" + packetsWithResponse + ") " + result2);

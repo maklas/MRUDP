@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestsSocket {
 
@@ -102,7 +103,7 @@ public class TestsSocket {
             @Override
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
                 boolean ok = request.getDataAsString().equals("1");
-                future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, 0, 0));
+                future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, true, 0, 0));
             }
         });
         clientSocket.sendRequest(localhost, port, "1");
@@ -113,7 +114,7 @@ public class TestsSocket {
             Thread.sleep(10);
             long difference = System.currentTimeMillis() - before;
             if (difference > maxTimeToWait){
-                future.put(new ResponsePackage(ResponsePackage.Type.Error, -1, 0));
+                future.put(new ResponsePackage(ResponsePackage.Type.Error, true, -1, 0));
             }
         }
 
@@ -138,9 +139,9 @@ public class TestsSocket {
         final MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
         final CountDownLatch latch = new CountDownLatch(times);
         for (int i = 0; i < times; i++) {
-            clientSocket.sendRequest(localhost, 1000, "100", 1500, new ResponseAdapter(){
+            clientSocket.sendRequest(localhost, 1000, "100", 1500, new ResponseHandlerAdapter(){
                 @Override
-                public void discard(Request request) {
+                public void discard(boolean internal, Request request) {
                     latch.countDown();
                 }
             });
@@ -320,7 +321,7 @@ public class TestsSocket {
 
             final AtomicInteger counter = new AtomicInteger();
 
-            ResponseHandler nullRH = new ResponseAdapter(){
+            ResponseHandler nullRH = new ResponseHandlerAdapter(){
                 @Override
                 public void handle(Request request, Response response) {
                     counter.incrementAndGet();
@@ -372,15 +373,10 @@ public class TestsSocket {
 
 
         for (int i = 0; i < 10; i++) {
-            clientSocket.sendRequest(localhost, port, "Hello " + i, 2000, new ResponseAdapter(){
+            clientSocket.sendRequest(localhost, port, "Hello " + i, 2000, new ResponseHandlerAdapter(2){
                 @Override
                 public void handle(Request request, Response response) {
                     System.out.println("handled: " + request.getDataAsString());
-                }
-
-                @Override
-                public int getTimesToResend() {
-                    return 2;
                 }
             });
         }
@@ -434,7 +430,7 @@ public class TestsSocket {
 
         Thread.sleep(50);
         for (int i = 0; i < timesToSend; i++) {
-            clientSocket.sendRequest(localhost, port, testData + " " + i, responseTimeOut, new ResponseAdapter(){
+            clientSocket.sendRequest(localhost, port, testData + " " + i, responseTimeOut, new ResponseHandlerAdapter(retries){
                 @Override
                 public void handle(Request request, Response response) {
                     success.incrementAndGet();
@@ -442,14 +438,9 @@ public class TestsSocket {
                 }
 
                 @Override
-                public void discard(Request request) {
+                public void discard(boolean internal, Request request) {
                     failure.incrementAndGet();
                     latch.countDown();
-                }
-
-                @Override
-                public int getTimesToResend() {
-                    return retries;
                 }
             });
         }
@@ -481,5 +472,56 @@ public class TestsSocket {
         ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, new byte[]{0}, 1000, 1).get();
         assertEquals(ResponsePackage.Type.Discarded, responsePackage.getType());
         assertEquals(SocketUtils.DISCARDED, responsePackage.getResponseCode());
+    }
+
+    @Test(timeout = 6 * 1000)
+    public void testInternalDiscard() throws Exception {
+        final int port = 3008;
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicBoolean internalResult = new AtomicBoolean(false);
+
+        ResponseHandlerAdapter handler = new ResponseHandlerAdapter(1) {
+            @Override
+            public void discard(boolean internal, Request request) {
+                internalResult.set(internal);
+                latch.countDown();
+            }
+        };
+        handler.setKeepResending(false);
+        clientSocket.sendRequest(localhost, port, "123".getBytes(), 2000, handler);
+
+        latch.await();
+        assertTrue(internalResult.get());
+
+    }
+    @Test(timeout = 6 * 1000)
+    public void testInternalDiscardWithOk() throws Exception {
+        final int port = 3008;
+        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicBoolean internalResult = new AtomicBoolean(false);
+
+        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                response.setResponseCode(SocketUtils.OK);
+            }
+        });
+
+        ResponseHandlerAdapter handler = new ResponseHandlerAdapter(1) {
+            @Override
+            public void discard(boolean internal, Request request) {
+                internalResult.set(internal);
+                latch.countDown();
+            }
+        };
+        handler.setKeepResending(false);
+        clientSocket.sendRequest(localhost, port, "123".getBytes(), 2000, handler);
+
+        latch.await();
+        assertTrue(internalResult.get());
+
     }
 }

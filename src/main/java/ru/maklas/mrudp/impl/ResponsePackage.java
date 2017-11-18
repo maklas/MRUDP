@@ -9,6 +9,7 @@ public class ResponsePackage {
 
     private Type type;
     private byte[] data;
+    private boolean internalDiscard;
     private int responseCode;
     private int sequenceNumber = 0;
 
@@ -19,8 +20,9 @@ public class ResponsePackage {
         this.sequenceNumber = sequenceNumber;
     }
 
-    public ResponsePackage(Type type, int responseCode, int sequenceNumber) {
+    public ResponsePackage(Type type, boolean internalDiscard, int responseCode, int sequenceNumber) {
         this.type = type;
+        this.internalDiscard = internalDiscard;
         this.sequenceNumber = sequenceNumber;
         this.data = new byte[0];
         this.responseCode = responseCode;
@@ -46,6 +48,9 @@ public class ResponsePackage {
         return sequenceNumber;
     }
 
+    public boolean isInternalDiscard() {
+        return internalDiscard;
+    }
 
     @Override
     public String toString() {

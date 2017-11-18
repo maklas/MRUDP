@@ -108,17 +108,18 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
     private void update(){
         synchronized (requestHashMap){
+            final long updateStartTime = System.currentTimeMillis();
             Iterator<Map.Entry<Integer, RequestHandleWrap>> iterator = requestHashMap.entrySet().iterator();
 
             while (iterator.hasNext()){
                 RequestHandleWrap triple = iterator.next().getValue();
                 final RequestWriter request = triple.request;
-                if (triple.msSinceCreation() > request.getDiscardTime()){
+                if (triple.msSinceCreation(updateStartTime) > request.getDiscardTime()){
 
                     final ResponseHandler handler = triple.handler;
 
-                    if (handler.getTimesToResend() > request.getTimesRequested()){
-                        triple.timeCreated = System.currentTimeMillis();
+                    if (handler.getTimesToResend() > request.getTimesRequested() && handler.keepResending()){
+                        triple.timeCreated = updateStartTime;
                         request.incTimesRequested();
                         sendData(request.getAddress(), request.getPort(), request.getData(), SocketUtils.REQUEST_TYPE, request.getSequenceNumber(), true, true);
                         log("Retry for: " + request + " #" + request.getTimesRequested());
@@ -127,7 +128,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         service.execute(new Runnable() {
                             @Override
                             public void run() {
-                                handler.discard(request);
+                                handler.discard(!handler.keepResending(), request);
                             }
                         });
                     }
@@ -230,18 +231,27 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
                         final Response response = new ResponseImpl(seq, address, port, msgCode, data);
                         Runnable action;
 
-                        if (!SocketUtils.isAnErrorCode(msgCode)){
-                            action = new Runnable() {
-                                @Override
-                                public void run() {
-                                    handler.handle(oldRequest, response);
-                                }
-                            };
+                        if (handler.keepResending()) {
+                            if (!SocketUtils.isAnErrorCode(msgCode)) {
+                                action = new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handler.handle(oldRequest, response);
+                                    }
+                                };
+                            } else {
+                                action = new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handler.handleError(oldRequest, response, msgCode);
+                                    }
+                                };
+                            }
                         } else {
                             action = new Runnable() {
                                 @Override
                                 public void run() {
-                                    handler.handleError(oldRequest, response, msgCode);
+                                    handler.discard(true, oldRequest);
                                 }
                             };
                         }
@@ -313,7 +323,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     public FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, final int resendTries) {
         final FutureResponse ret = new FutureResponse();
 
-        sendRequest(address, port, data, discardTime, new ResponseHandler() {
+        sendRequest(address, port, data, discardTime, new ResponseHandler(resendTries) {
             @Override
             public void handle(Request request, Response response) {
                 ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
@@ -325,13 +335,8 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
             }
 
             @Override
-            public void discard(Request request) {
-                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, 0, request.getSequenceNumber()));
-            }
-
-            @Override
-            public int getTimesToResend() {
-                return resendTries;
+            public void discard(boolean internal, Request request) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, internal, 0, request.getSequenceNumber()));
             }
         });
 
@@ -448,9 +453,14 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
             this.handler = handler;
         }
 
+        long msSinceCreation(long currentTime){
+            return currentTime - timeCreated;
+        }
+
         long msSinceCreation(){
             return System.currentTimeMillis() - timeCreated;
         }
+
     }
 
     private class NullProcessor implements RequestProcessor {
