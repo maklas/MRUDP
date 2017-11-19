@@ -23,8 +23,8 @@ public class PerformanceTest {
     @Test
     public void testSendingSpeed() throws Exception {
         final int port = 3000;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
 
         final int packetSize = 100;
         byte[] data = new byte[packetSize];
@@ -87,8 +87,8 @@ public class PerformanceTest {
     @Test
     public void memoryLeakTest() throws Exception {
         final int port = 3001;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, MRUDPSocketImpl.DEFAULT_WORKERS, MRUDPSocketImpl.DEFAULT_UPDATE_CD, MRUDPSocketImpl.DELETE_RESPONSES_MS);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize, true, FixedBufferMRUDP.DEFAULT_WORKERS, FixedBufferMRUDP.DEFAULT_UPDATE_CD, FixedBufferMRUDP.DELETE_RESPONSES_MS);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override

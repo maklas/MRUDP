@@ -1,18 +1,23 @@
 package ru.maklas.mrudp.impl;
 
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import ru.maklas.mrudp.*;
 
+import java.io.File;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -96,8 +101,8 @@ public class TestsSocket {
     @Test
     public void testSimpleRequest() throws Exception {
         final int port = 3000;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
         final FutureResponse future = new FutureResponse();
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -106,7 +111,7 @@ public class TestsSocket {
                 future.put(new ResponsePackage(ok ? ResponsePackage.Type.Ok : ResponsePackage.Type.Error, true, 0, 0));
             }
         });
-        clientSocket.sendRequest(localhost, port, "1");
+        clientSocket.sendRequest(localhost, port, "1".getBytes());
 
         long maxTimeToWait = 500;
         long before = System.currentTimeMillis();
@@ -128,7 +133,7 @@ public class TestsSocket {
     public void testConnectionRecreation() throws Exception {
         final int port = 3001;
         for (int i = 0; i < 30; i++) {
-            MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
+            MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
             serverSocket.killConnection();
         }
     }
@@ -136,10 +141,10 @@ public class TestsSocket {
     @Test(timeout = 10 * 1000)
     public void testMassiveDiscard() throws Exception {
         final int times = 5000;
-        final MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        final MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
         final CountDownLatch latch = new CountDownLatch(times);
         for (int i = 0; i < times; i++) {
-            clientSocket.sendRequest(localhost, 1000, "100", 1500, new ResponseHandlerAdapter(){
+            clientSocket.sendRequest(localhost, 1000, "100".getBytes(), 1500, new ResponseHandlerAdapter(){
                 @Override
                 public void discard(boolean internal, Request request) {
                     latch.countDown();
@@ -157,8 +162,8 @@ public class TestsSocket {
         final int discardTime = 1000;
         final int firstRequestSleepTime = (int) (discardTime * 1.5f);
 
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize, true, 5, 15, 4000);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize, true, 5, 15, 4000);
 
 
         final AtomicInteger totalRequestsReceived = new AtomicInteger(0);
@@ -189,8 +194,8 @@ public class TestsSocket {
         final int port = 3003;
         final int timesToSend = 15000;
         final CountDownLatch latch = new CountDownLatch(timesToSend);
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -223,8 +228,8 @@ public class TestsSocket {
 
         System.out.println("Server address: " + localhost);
 
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(serverUDP, bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(clientUDP, bufferSize);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -246,8 +251,8 @@ public class TestsSocket {
     @Test
     public void sizeTest() throws Exception {
         final int port = 3004;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), 4096);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), 4096);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), 4096);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), 4096);
 
         int[] sizes = new int[]{1, 512, 1024, 4096};
 
@@ -276,8 +281,8 @@ public class TestsSocket {
     public void testSequentialDataTransmission() throws Exception {
         final int port = 3005;
         final int times = 100000;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), 4096);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), 4096);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), 4096);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), 4096);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -351,19 +356,9 @@ public class TestsSocket {
     @Test
     public void delayedRequest() throws Exception {
         final int port = 3006;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
-        MrudpLogger logger = new MrudpLogger() {
-            @Override
-            public void log(String msg) {
-                System.err.println(msg);
-            }
-
-            @Override
-            public void log(Exception e) {
-                e.printStackTrace();
-            }
-        };
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
+        MrudpLogger logger = new DefaultMrudpLogger();
         serverSocket.setLogger(logger);
         clientSocket.setLogger(logger);
 
@@ -373,10 +368,10 @@ public class TestsSocket {
 
 
         for (int i = 0; i < 10; i++) {
-            clientSocket.sendRequest(localhost, port, "Hello " + i, 2000, new ResponseHandlerAdapter(2){
+            clientSocket.sendRequest(localhost, port, ("Hello " + i).getBytes(), 2000, new ResponseHandlerAdapter(2){
                 @Override
                 public void handle(Request request, Response response) {
-                    System.out.println("handled: " + request.getDataAsString());
+
                 }
             });
         }
@@ -385,7 +380,6 @@ public class TestsSocket {
 
         for (int i = 0; i < 10; i++) {
             DelayedRequest take = processor.take();
-            System.out.println(take);
             take.responseEmpty();
         }
 
@@ -416,8 +410,8 @@ public class TestsSocket {
 
         System.out.println("Server address: " + localhost);
 
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(serverUDP, bufferSize, true, 150, 75, 30000);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(clientUDP, bufferSize, true, 150, 75, 2000);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(serverUDP, bufferSize, true, 150, 75, 30000);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(clientUDP, bufferSize, true, 150, 75, 2000);
 
         final AtomicInteger counter = new AtomicInteger();
         serverSocket.setProcessor(new RequestProcessor() {
@@ -430,7 +424,7 @@ public class TestsSocket {
 
         Thread.sleep(50);
         for (int i = 0; i < timesToSend; i++) {
-            clientSocket.sendRequest(localhost, port, testData + " " + i, responseTimeOut, new ResponseHandlerAdapter(retries){
+            clientSocket.sendRequest(localhost, port, (testData + " " + i).getBytes(), responseTimeOut, new ResponseHandlerAdapter(retries){
                 @Override
                 public void handle(Request request, Response response) {
                     success.incrementAndGet();
@@ -456,8 +450,8 @@ public class TestsSocket {
     @Test
     public void testNoResponse() throws Exception {
         final int port = 3007;
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
 
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
@@ -477,7 +471,7 @@ public class TestsSocket {
     @Test(timeout = 6 * 1000)
     public void testInternalDiscard() throws Exception {
         final int port = 3008;
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean internalResult = new AtomicBoolean(false);
 
@@ -498,11 +492,11 @@ public class TestsSocket {
     @Test(timeout = 6 * 1000)
     public void testInternalDiscardWithOk() throws Exception {
         final int port = 3008;
-        MRUDPSocket clientSocket = new MRUDPSocketImpl(new JavaUDPSocket(), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean internalResult = new AtomicBoolean(false);
 
-        MRUDPSocket serverSocket = new MRUDPSocketImpl(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
         serverSocket.setProcessor(new RequestProcessor() {
             @Override
             public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
@@ -523,5 +517,79 @@ public class TestsSocket {
         latch.await();
         assertTrue(internalResult.get());
 
+    }
+
+    @Test
+    public void testSendFromStream() throws Exception {
+        final String msg = "Hello";
+        final byte[] byteMsg = msg.getBytes();
+        ByteInputStream bis = new ByteInputStream(byteMsg, byteMsg.length);
+
+        final int port = 3009;
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
+        
+        clientSocket.setLogger(new DefaultMrudpLogger());
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                assertArrayEquals(byteMsg, request.getData());
+                response.setData(request.getData());
+            }
+        });
+
+
+        ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, bis, 1000, 0).get();
+        assertArrayEquals(byteMsg, responsePackage.getData());
+    }
+
+    @Test
+    public void testSendFromFile() throws Exception{
+
+        final int port = 3010;
+        MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
+        MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
+
+        clientSocket.setLogger(new DefaultMrudpLogger());
+
+        InputStream file = TestsSocket.class.getClassLoader().getResourceAsStream("test.txt");
+
+        if (file == null){
+            throw new RuntimeException();
+        }
+
+        file.mark(bufferSize);
+
+        serverSocket.setProcessor(new RequestProcessor() {
+            @Override
+            public void process(Request request, ResponseWriter response, boolean responseRequired) throws Exception {
+                response.setData(request.getData());
+            }
+        });
+
+
+        ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, file, 1000, 0).get();
+        file.reset();
+        Scanner scanner = new Scanner(file);
+        String s = scanner.nextLine().substring(0, bufferSize);
+        assertEquals(s, responsePackage.getDataAsString());
+        System.out.println(responsePackage);
+    }
+    
+    
+    
+    
+    private class DefaultMrudpLogger implements MrudpLogger{
+        
+        @Override
+        public void log(String msg) {
+            System.err.println(msg);
+        }
+        
+        @Override
+        public void log(Exception e) {
+            e.printStackTrace();
+        }
     }
 }

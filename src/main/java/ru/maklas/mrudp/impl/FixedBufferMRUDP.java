@@ -4,6 +4,7 @@ package ru.maklas.mrudp.impl;
 import ru.maklas.mrudp.*;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -21,7 +22,7 @@ import java.util.concurrent.ThreadFactory;
  * <li>Sends lost packet multiple times if it's lost;</li>
  * <li>Watching over packets using sequence number.</li></p>
  */
-public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
+public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
 
     public static final int DEFAULT_UPDATE_CD = 100;
     public static final int DEFAULT_WORKERS = 50;
@@ -38,18 +39,20 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     private final Object sendingMonitor = new Object();
     private final Object processorMonitor = new Object();
 
-    private int seq = (int) (Math.random() * Long.MAX_VALUE);
+    private int seq = (int) (Math.random() * Integer.MAX_VALUE);
+    private final int bufferSize;
     private RequestProcessor processor;
     private ResponseMap responseMap; // ctrl+F the "--1" to se usage. Can be safely deleted
 
-    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, final boolean daemon, int workers, final int updateThreadCD, final int deleteResponseCD) throws Exception {
-        bufferSize += 6;
+    public FixedBufferMRUDP(UDPSocket dSocket, int bufferSize, final boolean daemon, int workers, final int updateThreadCD, final int deleteResponseCD) throws Exception {
+        this.bufferSize = bufferSize;
+        final int datagramBufferSize = bufferSize += 6;
         this.socket = dSocket;
         this.processor = new NullProcessor();
         requestHashMap = new HashMap<Integer, RequestHandleWrap>();
         responseMap = new ResponseMap(deleteResponseCD);
-        receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
-        sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        receivingPacket = new DatagramPacket(new byte[datagramBufferSize], datagramBufferSize);
+        sendingPacket = new DatagramPacket(new byte[datagramBufferSize], datagramBufferSize);
         final ThreadFactory threadFactory = new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -82,7 +85,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         updateThread.start();
     }
 
-    public MRUDPSocketImpl(UDPSocket socket, int bufferSize) throws Exception {
+    public FixedBufferMRUDP(UDPSocket socket, int bufferSize) throws Exception {
         this(socket, bufferSize, true, DEFAULT_WORKERS, DEFAULT_UPDATE_CD, DELETE_RESPONSES_MS);
     }
 
@@ -290,13 +293,32 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
 
 
     @Override
-    public void sendRequest(InetAddress address, int port, String data, int responseTimeOut, ResponseHandler handler) {
-        sendRequest(address, port, data.getBytes(), responseTimeOut, handler);
+    public void sendRequest(InetAddress address, int port, InputStream dataStream, int responseTimeOut, final ResponseHandler handler) {
+        try {
+            final byte[] data = getBytes(dataStream, bufferSize);
+            sendRequest(address, port, data, responseTimeOut, handler);
+        } catch (IOException e) {
+            final RequestWriter request = new RequestImpl(seq, address, port, new byte[0], handler != null, false, responseTimeOut);
+            log(e);
+            if (handler != null){
+                service.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        handler.discard(true, request);
+                    }
+                });
+            }
+        }
     }
 
     @Override
-    public void sendRequest(InetAddress address, int port, String data) {
-        sendRequest(address, port, data, 0, null);
+    public void sendRequest(InetAddress address, int port, InputStream dataStream) {
+        try {
+            byte[] data = getBytes(dataStream, bufferSize);
+            sendRequest(address, port, data, 0, null);
+        } catch (IOException e) {
+            log(e);
+        }
     }
 
     @Override
@@ -340,6 +362,30 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
             }
         });
 
+
+        return ret;
+    }
+
+    @Override
+    public FutureResponse sendRequestGetFuture(InetAddress address, int port, InputStream dataStream, int discardTime, int resendTries){
+        final FutureResponse ret = new FutureResponse();
+
+        sendRequest(address, port, dataStream, discardTime, new ResponseHandler(resendTries) {
+            @Override
+            public void handle(Request request, Response response) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
+            }
+
+            @Override
+            public void handleError(Request request, Response response, int errorCode) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Error, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
+            }
+
+            @Override
+            public void discard(boolean internal, Request request) {
+                ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, internal, 0, request.getSequenceNumber()));
+            }
+        });
 
         return ret;
     }
@@ -402,6 +448,14 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
     // Helpers //
     //*********//
 
+    private static byte[] getBytes(InputStream stream, int bufferSize) throws IOException {
+        byte[] buffer = new byte[bufferSize];
+        int byteRead = stream.read(buffer);
+        byte[] data = new byte[byteRead];
+        System.arraycopy(buffer, 0, data, 0, byteRead);
+        return data;
+    }
+
     private static byte[] getDataFrom(byte[] bytes, int from, int length){
         byte[] out = new byte[length];
         System.arraycopy(bytes, from, out, 0, length);
@@ -432,7 +486,7 @@ public class MRUDPSocketImpl implements Runnable, MRUDPSocket {
         output[5] = (byte) type;
 
         //копируем данные в пакет
-        System.arraycopy(data, 0, output, 6, output.length - 6);
+        System.arraycopy(data, 0, output, 6, data.length);
 
         return output;
     }
