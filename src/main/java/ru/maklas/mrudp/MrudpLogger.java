@@ -10,4 +10,9 @@ public interface MrudpLogger {
 
     void log(Exception e);
 
+    void logRetry(Request request);
+
+    void logQuitting();
+
+    void logResponseWithoutRequest(byte[] fullData);
 }

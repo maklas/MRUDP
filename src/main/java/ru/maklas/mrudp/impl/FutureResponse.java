@@ -8,6 +8,7 @@ public class FutureResponse {
 
     private ResponsePackage data = null;
     private boolean released = false;
+    private ResponseHandlerAdapter handler;
 
     synchronized void put(ResponsePackage data){
         if (released){
@@ -32,4 +33,11 @@ public class FutureResponse {
         return released;
     }
 
+    void setHandler(ResponseHandlerAdapter handler) {
+        this.handler = handler;
+    }
+
+    public void stop(){
+        handler.setKeepResending(false);
+    }
 }
