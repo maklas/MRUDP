@@ -254,7 +254,11 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                                 }
                             };
                         }
-                        service.execute(action);
+                        try {
+                            service.execute(action);
+                        } catch (Exception e) {
+                            log(e);
+                        }
 
                     } else {
                         logRequestNotFoundForResponse(fullData);
