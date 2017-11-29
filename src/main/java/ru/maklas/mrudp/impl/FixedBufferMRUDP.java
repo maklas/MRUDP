@@ -128,12 +128,16 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                         logRetry(request);
                     } else {
                         iterator.remove();
-                        service.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                handler.discard(!handler.keepResending(), request);
-                            }
-                        });
+                        try {
+                            service.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    handler.discard(!handler.keepResending(), request);
+                                }
+                            });
+                        } catch (Exception e) {
+                            log(e);
+                        }
                     }
                 }
             }
@@ -254,11 +258,8 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                                 }
                             };
                         }
-                        try {
-                            service.execute(action);
-                        } catch (Exception e) {
-                            log(e);
-                        }
+
+                        service.execute(action);
 
                     } else {
                         logRequestNotFoundForResponse(fullData);
@@ -271,6 +272,8 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                 break;
             } catch (IOException e){
                 log("IOE in receiving thread");
+            } catch (Exception ex){
+                log(ex);
             }
 
         }
@@ -302,12 +305,16 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
             final RequestWriter request = new RequestImpl(seq, address, port, new byte[0], handler != null, false, responseTimeOut);
             log(e);
             if (handler != null){
-                service.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        handler.discard(true, request);
-                    }
-                });
+                try {
+                    service.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            handler.discard(true, request);
+                        }
+                    });
+                } catch (Exception e1) {
+                    log(e1);
+                }
             }
         }
     }
