@@ -2,24 +2,19 @@ package ru.maklas.mrudp.impl;
 
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import ru.maklas.mrudp.*;
 
-import java.io.File;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestsSocket {
 
@@ -565,28 +560,11 @@ public class TestsSocket {
             }
         });
 
-
         ResponsePackage responsePackage = clientSocket.sendRequestGetFuture(localhost, port, file, 1000, 0).get();
         file.reset();
         Scanner scanner = new Scanner(file);
         String s = scanner.nextLine().substring(0, bufferSize);
         assertEquals(s, responsePackage.getDataAsString());
         System.out.println(responsePackage);
-    }
-    
-    
-    
-    
-    private class DefaultMrudpLogger implements MrudpLogger{
-        
-        @Override
-        public void log(String msg) {
-            System.err.println(msg);
-        }
-        
-        @Override
-        public void log(Exception e) {
-            e.printStackTrace();
-        }
     }
 }

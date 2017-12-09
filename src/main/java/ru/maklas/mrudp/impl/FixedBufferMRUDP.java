@@ -125,21 +125,24 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                         triple.timeCreated = updateStartTime;
                         request.incTimesRequested();
                         sendData(request.getAddress(), request.getPort(), request.getData(), SocketUtils.REQUEST_TYPE, request.getSequenceNumber(), true, true);
-                        log("Retry for: " + request + " #" + request.getTimesRequested());
+                        logRetry(request);
                     } else {
                         iterator.remove();
-                        service.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                handler.discard(!handler.keepResending(), request);
-                            }
-                        });
+                        try {
+                            service.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    handler.discard(!handler.keepResending(), request);
+                                }
+                            });
+                        } catch (Exception e) {
+                            log(e);
+                        }
                     }
                 }
             }
         }
     }
-
 
     @Override
     public void run() {
@@ -212,9 +215,6 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                                 response.setProcessing(false);
 
                             } catch (Exception e) {
-                                log("Exception while processing request: " + e.getClass().getSimpleName() +
-                                ".\n" + "Request=" + request.getDataAsString() + "\n" +
-                                "Response=" + response);
                                 log(e);
                             }
                         }
@@ -258,10 +258,11 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                                 }
                             };
                         }
+
                         service.execute(action);
 
                     } else {
-                        log("No saved request for packet '" + new String(fullData) + "'");
+                        logRequestNotFoundForResponse(fullData);
                     }
                 }
 
@@ -271,12 +272,15 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
                 break;
             } catch (IOException e){
                 log("IOE in receiving thread");
+            } catch (Exception ex){
+                log(ex);
             }
 
         }
 
-        log("Receiving thread has stopped!");
+        logQuitting();
     }
+
 
 
     private void incSeq(){
@@ -301,12 +305,16 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
             final RequestWriter request = new RequestImpl(seq, address, port, new byte[0], handler != null, false, responseTimeOut);
             log(e);
             if (handler != null){
-                service.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        handler.discard(true, request);
-                    }
-                });
+                try {
+                    service.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            handler.discard(true, request);
+                        }
+                    });
+                } catch (Exception e1) {
+                    log(e1);
+                }
             }
         }
     }
@@ -345,7 +353,7 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
     public FutureResponse sendRequestGetFuture(InetAddress address, int port, byte[] data, int discardTime, final int resendTries) {
         final FutureResponse ret = new FutureResponse();
 
-        sendRequest(address, port, data, discardTime, new ResponseHandler(resendTries) {
+        final ResponseHandlerAdapter handler = new ResponseHandlerAdapter(resendTries) {
             @Override
             public void handle(Request request, Response response) {
                 ret.put(new ResponsePackage(ResponsePackage.Type.Ok, response.getResponseCode(), response.getData(), response.getSequenceNumber()));
@@ -360,7 +368,9 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
             public void discard(boolean internal, Request request) {
                 ret.put(new ResponsePackage(ResponsePackage.Type.Discarded, internal, 0, request.getSequenceNumber()));
             }
-        });
+        };
+        ret.setHandler(handler);
+        sendRequest(address, port, data, discardTime, handler);
 
 
         return ret;
@@ -438,6 +448,20 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
             logger.log(e);
         }
     }
+
+    private void logQuitting() {
+        if (logger != null) logger.logQuitting();
+    }
+
+    private void logRequestNotFoundForResponse(byte[] fullData) {
+        if (logger != null) logger.logResponseWithoutRequest(fullData);
+    }
+
+    private void logRetry(RequestWriter request) {
+        if (logger != null)
+            logger.logRetry(request);
+    }
+
 
     @Override
     public int getLocalPort() {
