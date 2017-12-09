@@ -358,9 +358,6 @@ public class TestsSocket {
         final int port = 3006;
         MRUDPSocket serverSocket = new FixedBufferMRUDP(new JavaUDPSocket(port), bufferSize);
         MRUDPSocket clientSocket = new FixedBufferMRUDP(new JavaUDPSocket(), bufferSize);
-        MrudpLogger logger = new DefaultMrudpLogger();
-        serverSocket.setLogger(logger);
-        clientSocket.setLogger(logger);
 
 
         DelayedRequestProcessor processor = new DelayedRequestProcessor(3000);

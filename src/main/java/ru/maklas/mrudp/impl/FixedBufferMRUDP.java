@@ -495,6 +495,10 @@ public class FixedBufferMRUDP implements Runnable, MRUDPSocket {
         return bytes[0] << 24 | (bytes[1] & 0xFF) << 16 | (bytes[2] & 0xFF) << 8 | (bytes[3] & 0xFF);
     }
 
+    public int getBufferSize() {
+        return bufferSize;
+    }
+
     private static class RequestHandleWrap{
 
         long timeCreated;
