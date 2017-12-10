@@ -100,9 +100,9 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
             }
         });
 
-        byte[] bytes = null;
+        byte[] fullResponse = null;
         try {
-            bytes = futureResponse.get(timeout, TimeUnit.MILLISECONDS);
+            fullResponse = futureResponse.get(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e1) {
             e1.printStackTrace();
         } catch (ExecutionException e1) {
@@ -113,15 +113,17 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
             e1.printStackTrace();
         }
 
-        if (bytes == null || bytes.length < 5){
+        if (fullResponse == null){
             state.set(SocketState.NOT_CONNECTED);
             connectingToAddress = null;
             return new ConnectionResponse(ConnectionResponse.Type.NO_RESPONSE, new byte[0]);
         }
 
-        boolean[] settings = getSettings(bytes[0]);
+        boolean[] settings = getSettings(fullResponse[0]);
         boolean accepted = settings[CONNECTION_RESP_POS];
-        ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, bytes);
+        byte[] userData = new byte[fullResponse.length - 5];
+        System.arraycopy(fullResponse, 5, userData, 0, userData.length);
+        ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, userData);
         if (accepted) {
             state.set(SocketState.CONNECTED);
         }
@@ -272,6 +274,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         MRUDPListener[] newListeners = new MRUDPListener[length + 1];
         System.arraycopy(listeners, 0, newListeners, 0, length);
         newListeners[length] = listener;
+        this.listeners = newListeners;
     }
 
     @Override
@@ -393,9 +396,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
         if (address.equals(connectingToAddress) && port == connectingToPort){
             if (state.get() == SocketState.CONNECTING) {
-                byte[] userResponse = new byte[fullPackage.length - 5];
-                System.arraycopy(fullPackage, 5, userResponse, 0, userResponse.length);
-                this.connectingResponse = userResponse;
+                this.connectingResponse = fullPackage;
             }
         }
     }
@@ -604,17 +605,17 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         return buildSettings(reliable, isConnReq, isRequest, alreadySent, false);
     }
 
-    private static byte buildSettings(boolean reliable, boolean isConnReq, boolean isRequest, boolean alreadySent, boolean connectionRespponse){
+    private static byte buildSettings(boolean reliable, boolean isConnReq, boolean isRequest, boolean alreadySent, boolean connectionResponse){
         return (byte) (
                         (reliable ? 1<< IS_RELIABLE_POS : 0) +
                         (isConnReq ? 1<< IS_CONNECTION_POS : 0) +
                         (isRequest ? 1<<IS_REQUEST_POS : 0) +
                         (alreadySent ? 1<<ALREADY_SENT_POS : 0) +
-                        (connectionRespponse ? 1<< CONNECTION_RESP_POS : 0));
+                        (connectionResponse ? 1<< CONNECTION_RESP_POS : 0));
     }
 
     private static byte[] buildDC(){
-        byte settings = 1<< DC_POS;
+        byte settings = (byte) ((1 << DC_POS) + (1<< IS_REQUEST_POS));
         return new byte[]{settings, 0, 0, 0, 0};
     }
 

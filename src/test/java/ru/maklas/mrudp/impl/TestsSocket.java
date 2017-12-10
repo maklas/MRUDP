@@ -169,14 +169,26 @@ public class TestsSocket implements ServerModel {
         final MRUDPServerSocket server = new MRUDPServerSocket(new JavaUDPSocket(port), 512, new ServerModel() {
             @Override
             public byte[] validateNewConnection(InetAddress address, int port, byte[] userData) {
-                return new byte[0];
+                return new byte[]{0, 0, 0, 0};
             }
 
             @Override
-            public void registerNewConnection(FixedBufferMRUDP2 socket) {
+            public void registerNewConnection(final FixedBufferMRUDP2 socket) {
                 System.out.println("Registered new Connection");
                 socket.start(true, 50);
-                new ClientThread("Server bean", socket);
+                new ClientThread("Server bean", socket).start();
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        socket.send("12345".getBytes());
+                    }
+                }).start();
             }
 
             @Override
@@ -194,9 +206,9 @@ public class TestsSocket implements ServerModel {
         final MRUDPSocket2 client = new FixedBufferMRUDP2(new JavaUDPSocket(), 512);
         client.start(true, 50);
 
-        ConnectionResponse connect = client.connect(2000, localHost, port, "Hello. I'm Maklas".getBytes());
+        ConnectionResponse connect = client.connect(5000, localHost, port, "Hello. I'm Maklas".getBytes());
         System.out.println(connect.getType());
-        new ClientThread("ClientReceive Thread" , client);
+        new ClientThread("ClientReceive Thread" , client).start();
 
         client.addListener(new MRUDPListener() {
             @Override
@@ -206,12 +218,23 @@ public class TestsSocket implements ServerModel {
         });
         for (int i = 0; i < 10; i++) {
             client.send(Integer.toString(i).getBytes());
-            Thread.sleep(500);
+            Thread.sleep(100);
         }
 
         client.close();
 
         Thread.sleep(10000);
+
+        ConnectionResponse connect1 = client.connect(5000, localHost, port, "Hello again".getBytes());
+        System.out.println(connect1.getType());
+
+        client.send("777".getBytes());
+
+        Thread.sleep(3000);
+
+
+        client.close();
+        Thread.sleep(15000);
 
 
 
