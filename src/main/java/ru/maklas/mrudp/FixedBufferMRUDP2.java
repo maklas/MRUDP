@@ -54,6 +54,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private long lastPingSendTime;
     private volatile int lastPingSeq;
     private volatile int currentPing = 0;
+    private Object userData = null;
 
     public FixedBufferMRUDP2(int bufferSize) throws Exception{
         this(new JavaUDPSocket(), bufferSize, 12 * 1000);
@@ -622,6 +623,16 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     @Override
     public int getPing() {
         return currentPing;
+    }
+
+    @Override
+    public void setUserData(Object userData) {
+        this.userData = userData;
+    }
+
+    @Override
+    public Object getUserData() {
+        return userData;
     }
 
     /* UTILS */

@@ -28,6 +28,8 @@ public interface MRUDPSocket2 {
 
     void setPingUpdateTime(int ms);
 
+    void setUserData(Object userData);
+
 
     // GETTERS
 
@@ -44,5 +46,7 @@ public interface MRUDPSocket2 {
     boolean isProcessing();
 
     int getPing();
+
+    Object getUserData();
 
 }
