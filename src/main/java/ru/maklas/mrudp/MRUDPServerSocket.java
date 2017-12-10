@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import ru.maklas.mrudp.impl.JavaUDPSocket;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -14,14 +16,20 @@ public class MRUDPServerSocket {
     private final HashMap<Long, FixedBufferMRUDP2> connectionMap = new HashMap<Long, FixedBufferMRUDP2>();
     private final DatagramPacket datagramPacket;
     private final DatagramPacket sendingPacket;
+    private final int dcTimeDueToInactivity;
     private final int bufferSize;
 
-    public MRUDPServerSocket(UDPSocket socket, int bufferSize, ServerModel model) {
+    public MRUDPServerSocket(int port, int bufferSize, ServerModel model) throws Exception{
+        this(new JavaUDPSocket(port), bufferSize, model, 12 * 1000);
+    }
+
+    public MRUDPServerSocket(UDPSocket socket, int bufferSize, ServerModel model, int dcTimeDueToInactivity) {
         this.bufferSize = bufferSize;
         this.socket = socket;
         this.model = model;
         this.datagramPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        this.dcTimeDueToInactivity = dcTimeDueToInactivity;
     }
 
     public void start(){
@@ -97,8 +105,11 @@ public class MRUDPServerSocket {
         int socketSeq = exctractInt(fullData, 1);
         int expectSeq = exctractInt(fullData, 5);
         if (isValid){
+            if (validationResponse.length == 0){
+                validationResponse = new byte[]{0};
+            }
             sendConnectionResponse(address, port, socketSeq, true, validationResponse);
-            final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse);
+            final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse, dcTimeDueToInactivity);
             connectionMap.put(addressHash(address, port), socket);
             socket.addListener(new MRUDPListener() {
                 @Override

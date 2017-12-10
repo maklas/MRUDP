@@ -7,12 +7,13 @@ import java.net.InetAddress;
 
 public class TestsSocket implements ServerModel {
 
-    public static void main(String[] args) throws Exception {
-        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new JavaUDPSocket(9000), 50), 512,  new TestsSocket());
+    @Test
+    public void testFirst() throws Exception {
+        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new JavaUDPSocket(9000), 50), 512,  new TestsSocket(), 12000);
         server.start();
         InetAddress localHost = InetAddress.getLocalHost();
 
-        final MRUDPSocket2 client  = new FixedBufferMRUDP2(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512);
+        final MRUDPSocket2 client  = new FixedBufferMRUDP2(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 12000);
         client.start(true, 100);
         SimpleProfiler.start();
         ConnectionResponse response = client.connect(1000, localHost, 9000, "hello!".getBytes());
@@ -26,7 +27,7 @@ public class TestsSocket implements ServerModel {
         new ClientThread("Client", client).start();
 
 
-        final MRUDPSocket2 client2  = new FixedBufferMRUDP2(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512);
+        final MRUDPSocket2 client2  = new FixedBufferMRUDP2(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 12000);
         client2.start(true, 100);
         SimpleProfiler.start();
         ConnectionResponse response2 = client2.connect(15000, localHost, 9000, "hello2!".getBytes());
@@ -41,7 +42,6 @@ public class TestsSocket implements ServerModel {
 
         Thread.sleep(20000);
     }
-
 
     @Override
     public byte[] validateNewConnection(InetAddress address, int port, byte[] userData) {
@@ -98,15 +98,13 @@ public class TestsSocket implements ServerModel {
 
         @Override
         public void process(byte[] data, MRUDPSocket2 socket, SocketIterator iterator) {
-            System.out.println(name + ": " + new String(data));
-            /*
             String s = new String(data);
-            int val = Integer.parseInt(s);
-            if (val == 0){
-                SimpleProfiler.start();
-            } else if (val == 10000 - 1){
-                System.out.println("Time took: " + SimpleProfiler.getMS());
-            }*/
+            System.out.println(name + ": " + s);
+            if (s.equals("ping0")){
+                socket.send("ping1".getBytes());
+            } else if (s.equals("ping1")){
+                System.out.println("Ping: " + SimpleProfiler.getMS());
+            }
         }
     }
 
@@ -130,43 +128,11 @@ public class TestsSocket implements ServerModel {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     @Test
-    public void testDC() throws Exception {
+    public void testPing() throws Exception {
         final int port = 9001;
         final InetAddress localHost = InetAddress.getLocalHost();
-        final MRUDPServerSocket server = new MRUDPServerSocket(new JavaUDPSocket(port), 512, new ServerModel() {
+        final MRUDPServerSocket server = new MRUDPServerSocket(port, 512, new ServerModel() {
             @Override
             public byte[] validateNewConnection(InetAddress address, int port, byte[] userData) {
                 return new byte[]{0, 0, 0, 0};
@@ -203,7 +169,7 @@ public class TestsSocket implements ServerModel {
         });
         server.start();
 
-        final MRUDPSocket2 client = new FixedBufferMRUDP2(new JavaUDPSocket(), 512);
+        final MRUDPSocket2 client = new FixedBufferMRUDP2(new PacketLossUDPSocket(new HighPingUDPSocket(new JavaUDPSocket(), 250), 15), 512, 12000);
         client.start(true, 50);
 
         ConnectionResponse connect = client.connect(5000, localHost, port, "Hello. I'm Maklas".getBytes());
@@ -218,25 +184,67 @@ public class TestsSocket implements ServerModel {
         });
         for (int i = 0; i < 10; i++) {
             client.send(Integer.toString(i).getBytes());
-            Thread.sleep(100);
+            Thread.sleep(15);
         }
 
-        client.close();
+        Thread.sleep(5000);
 
-        Thread.sleep(10000);
+        SimpleProfiler.start();
+        client.send("ping0".getBytes());
 
-        ConnectionResponse connect1 = client.connect(5000, localHost, port, "Hello again".getBytes());
-        System.out.println(connect1.getType());
+        Thread.sleep(5000);
 
-        client.send("777".getBytes());
+    }
 
-        Thread.sleep(3000);
+    @Test
+    public void testAutoPing() throws Exception {
+        InetAddress localHost = InetAddress.getLocalHost();
+        int port = 9002;
+
+        MRUDPServerSocket server = new MRUDPServerSocket(new HighPingUDPSocket(new JavaUDPSocket(port), 25), 512, new ServerModel() {
+            @Override
+            public byte[] validateNewConnection(InetAddress address, int port, byte[] userData) {
+                System.out.println("Client validated");
+                return new byte[0];
+            }
+
+            @Override
+            public void registerNewConnection(FixedBufferMRUDP2 socket) {
+                socket.start(true, 50);
+                new ClientThread("server bean", socket).start();
+            }
+
+            @Override
+            public void handleUnknownSourceMsg(byte[] userData) {
+
+            }
+
+            @Override
+            public void onSocketDisconnected(FixedBufferMRUDP2 socket) {
+                System.out.println("Server DC");
+            }
+        }, 12000);
+        server.start();
+
+        MRUDPSocket2 client = new FixedBufferMRUDP2(512);
+        client.start(true, 50);
+        client.addListener(new MRUDPListener() {
+            @Override
+            public void onDisconnect(MRUDPSocket2 fixedBufferMRUDP2) {
+                System.out.println("DC");
+            }
+        });
+        new ClientThread("client bean", client).start();
+        ConnectionResponse connect = client.connect(5000, localHost, port, new byte[0]);
+        System.out.println(connect.getType());
 
 
-        client.close();
-        Thread.sleep(15000);
+        for (int i = 0; i < 5; i++) {
+            Thread.sleep(5000);
+            System.out.println(client.getPing());
+        }
 
-
+        //Thread.sleep(20000);
 
     }
 }

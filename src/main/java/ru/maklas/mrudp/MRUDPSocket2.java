@@ -26,6 +26,8 @@ public interface MRUDPSocket2 {
 
     void removeListeners(MRUDPListener listener);
 
+    void setPingUpdateTime(int ms);
+
 
     // GETTERS
 
@@ -40,5 +42,7 @@ public interface MRUDPSocket2 {
     int getLocalPort();
 
     boolean isProcessing();
+
+    int getPing();
 
 }

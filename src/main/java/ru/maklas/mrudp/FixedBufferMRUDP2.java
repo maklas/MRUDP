@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import ru.maklas.mrudp.impl.JavaUDPSocket;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -18,6 +20,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     static final int ALREADY_SENT_POS = 3;
     static final int CONNECTION_RESP_POS = 4;
     static final int DC_POS = 5;
+    static final int PING_POS = 6;
 
 
     private final AtomicReference<SocketState> state = new AtomicReference<SocketState>(SocketState.NOT_CONNECTED);
@@ -33,7 +36,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private final DatagramPacket sendingPacket;
     private final Object sendingMonitor = new Object();
 
-    private final LinkedBlockingQueue<byte[]> userDatas = new LinkedBlockingQueue<byte[]>();
+    private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
     private int lastInsertedSeq = 0;
 
     private boolean interrupted = false;
@@ -43,24 +46,41 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private boolean createdByServer = false;
     private byte[] responseForConnect = new byte[]{000};
 
-    public FixedBufferMRUDP2(UDPSocket dSocket, int bufferSize) {
+    private final int dcTimeDueToInactivity;
+    private volatile long lastCommunicationTime;
+
+    private static final int defaultPingCD = 4000;
+    private volatile int pingCD = defaultPingCD;
+    private long lastPingSendTime;
+    private volatile int lastPingSeq;
+    private volatile int currentPing = 0;
+
+    public FixedBufferMRUDP2(int bufferSize) throws Exception{
+        this(new JavaUDPSocket(), bufferSize, 12 * 1000);
+    }
+
+    public FixedBufferMRUDP2(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
         socket = dSocket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        this.dcTimeDueToInactivity = dcTimeDueToInactivity;
         createdByServer = false;
+        lastCommunicationTime = System.currentTimeMillis();
     }
 
-    FixedBufferMRUDP2(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect) {
+    FixedBufferMRUDP2(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect, int dcTimeDueToInactivity) {
         this.socket = socket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responseForConnect = responseForConnect;
+        this.dcTimeDueToInactivity = dcTimeDueToInactivity;
         this.createdByServer = true;
         this.lastConnectedAddress = connectedAddress;
         this.lastConnectedPort = connectedPort;
         this.lastInsertedSeq = expectSeq;
         this.seq.set(socketSeq);
         this.state.set(SocketState.CONNECTED);
+        this.lastCommunicationTime = System.currentTimeMillis();
     }
 
     @Override
@@ -127,6 +147,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         if (accepted) {
             state.set(SocketState.CONNECTED);
         }
+        lastPingSendTime = System.currentTimeMillis();
         lastConnectedAddress = address;
         lastConnectedPort = port;
         connectingToAddress = null;
@@ -172,16 +193,14 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                             int dataLength = packet.getLength();
                             byte[] data = new byte[dataLength];
                             System.arraycopy(packet.getData(), 0, data, 0, dataLength);
-                            if (!getSettings(data[0])[IS_CONNECTION_POS]) {
-                                if (new String(data, 5, dataLength - 5).startsWith("2 hey")) {
-                                    //System.out.println(name + " --- lastInsertedSEQ=" + lastInsertedSeq + ", " + getSettingsAsString(data[0]) + ",  " + exctractInt(data, 1) + ",   " +  new String(data, 5, dataLength - 5));
-                                }
-                            }
                             if (remoteAddress.equals(lastConnectedAddress) && remotePort == lastConnectedPort && isConnected()) {
                                 receive(remoteAddress, remotePort, data);
                             } else {
                                 if (remoteAddress.equals(connectingToAddress) && remotePort == connectingToPort && (state.get() == SocketState.CONNECTING)) {
-                                    receive(remoteAddress, remotePort, data);
+                                    boolean[] settings = getSettings(data[0]);
+                                    if (settings[IS_CONNECTION_POS] && !settings[IS_REQUEST_POS]) {
+                                        receive(remoteAddress, remotePort, data);
+                                    }
                                 }
                             }
 
@@ -215,7 +234,6 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                 }
             });
 
-
             updateThread.start();
         }
     }
@@ -234,7 +252,18 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                 }
                 break;
             case CONNECTED:
+                long currTime = System.currentTimeMillis();
+                if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
+                    dealWithDC();
+                    return;
+                }
+
+                if (currTime - lastPingSendTime > pingCD){
+                    sendPing();
+                    lastPingSendTime = currTime;
+                }
                 synchronized (requestList) {
+                    //TODO check on size to dc
                     Iterator<Object[]> savedRequests = requestList.iterator();
                     while (savedRequests.hasNext()) {
                         byte[] fullDataReq = (byte[]) savedRequests.next()[1];
@@ -248,16 +277,29 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
     }
 
+    private void sendPing() {
+        int seq = this.seq.getAndIncrement();
+        byte[] fullPackage = buildPing(seq);
+        lastPingSeq = seq;
+        saveRequest(seq, fullPackage);
+        sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
+    }
+
     @Override
     public void close() {
         if (!isConnected()){
             System.out.println("Closing, but not connected!");
             return;
         }
-
         sendData(lastConnectedAddress, lastConnectedPort, buildDC());
         state.set(SocketState.NOT_CONNECTED);
+        flushBuffers();
         triggerDCListeners();
+    }
+
+    private void flushBuffers() {
+        requestList.clear();
+        receiveQueue.clear();
     }
 
     @Override
@@ -304,10 +346,11 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         interrupted = false;
         try {
 
-            byte[] poll = userDatas.poll();
+            byte[] poll = receiveQueue.poll();
             while (poll != null){
                 if (poll.length == 0){
                     state.set(SocketState.NOT_CONNECTED);
+                    flushBuffers();
                     triggerDCListeners();
                     break;
                 }
@@ -315,7 +358,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                 if (interrupted){
                     break;
                 }
-                poll = userDatas.poll();
+                poll = receiveQueue.poll();
             }
 
         } catch (Throwable t){
@@ -324,6 +367,19 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         processing = false;
     }
 
+    @Override
+    public void setPingUpdateTime(final int ms) {
+        final int newPingCD;
+
+        if (ms < 0){
+            newPingCD = defaultPingCD;
+        } else if (ms == 0){
+            newPingCD = Integer.MAX_VALUE - 100000;
+        } else {
+            newPingCD = ms;
+        }
+        pingCD = newPingCD;
+    }
 
     private void triggerDCListeners(){
         MRUDPListener[] listeners = this.listeners;
@@ -346,6 +402,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     }
 
     void receive(InetAddress address, int port, byte[] fullPackage){
+        this.lastCommunicationTime = System.currentTimeMillis();
         if (fullPackage.length < 5){
             log("Received message less than 5 bytes long!");
             return;
@@ -360,12 +417,12 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
         if (settings[IS_REQUEST_POS]){
             if (settings[IS_RELIABLE_POS]){
-                dealWithRequest(address, port, seq, settings[ALREADY_SENT_POS], fullPackage);
+                dealWithRequest(address, port, seq, settings[PING_POS], fullPackage);
             } else {
                 dealWithUnreliableRequest(address, port, settings, fullPackage);
             }
         } else {
-            dealWithResponse(address, port, seq, fullPackage);
+            dealWithResponse(seq, fullPackage);
         }
     }
 
@@ -401,14 +458,18 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         }
     }
 
-    private void dealWithRequest(InetAddress address, int port, int seq, boolean alreadySent, byte[] fullPackage) {
+    private void dealWithRequest(InetAddress address, int port, int seq, boolean isPing, byte[] fullPackage) {
         byte[] responseData = buildResponse(seq);
         sendData(address, port, responseData);
         final int expectedSeq = this.lastInsertedSeq + 1;
         if (expectedSeq > seq){
         } else
         if (expectedSeq == seq){
-            insert(expectedSeq, fullPackage, 5);
+            if (isPing){
+                lastInsertedSeq++;
+            } else {
+                insert(expectedSeq, fullPackage, 5);
+            }
             checkForQueuedDatas();
         } else {
             byte[] userData = new byte[fullPackage.length - 5];
@@ -424,19 +485,22 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         }
         byte[] data = new byte[fullPackage.length - 5];
         System.arraycopy(fullPackage, 5,  data, 0, data.length);
-        userDatas.offer(data);
+        receiveQueue.offer(data);
     }
 
-    private void dealWithResponse(InetAddress address, int port, int seq, byte[] fullPackage) {
+    private void dealWithResponse(int seq, byte[] fullPackage) {
         int responseLength = fullPackage.length;
         if (responseLength != 5){
             log("Uexpected response length: " + responseLength);
         }
-        removeRequest(seq);
+        boolean removed = removeRequest(seq);
+        if (removed && lastPingSeq == seq){
+            currentPing = (int) (System.currentTimeMillis() - lastPingSendTime);
+        }
     }
 
     private void dealWithDC(){
-        userDatas.offer(new byte[0]);
+        receiveQueue.offer(new byte[0]);
     }
 
 
@@ -456,9 +520,15 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
                 for (Object[] pair : waitings) {
                     if (((Integer) pair[0]) == expectedSeq) {
-                        insert(expectedSeq, (byte[]) pair[1]);
-                        madeIt = true;
-                        continue;
+                        byte[] bytes = (byte[]) pair[1];
+                        if (bytes.length == 0){ // Если в очереди остался пинг, то мы ничего не делаем, а просто пропускаем seq
+                            lastInsertedSeq++;
+                            continue;
+                        } else {
+                            insert(expectedSeq, bytes);
+                            madeIt = true;
+                            continue;
+                        }
                     }
                 }
 
@@ -468,17 +538,15 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     }
 
     private void insert(int seq, byte[] fullData, int offset){
-        int old = lastInsertedSeq;
         this.lastInsertedSeq = seq;
         byte[] userData = new byte[fullData.length - offset];
         System.arraycopy(fullData, offset, userData, 0, userData.length);
-        //System.out.println("Inserting: " + new String(userData) + " under seq: " + seq + " old seq: " + old);
-        userDatas.offer(userData);
+        receiveQueue.offer(userData);
     }
 
     private void insert(int seq, byte[] userData){
         this.lastInsertedSeq = seq;
-        userDatas.offer(userData);
+        receiveQueue.offer(userData);
     }
 
     private final ArrayList<Object[]> waitings = new ArrayList<Object[]>(); //<Integer.class, byte[].class>
@@ -500,17 +568,18 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         }
     }
 
-    private void removeRequest(int seq) {
+    private boolean removeRequest(int seq) {
         synchronized (requestList) {
             Iterator<Object[]> iterator = requestList.iterator();
             while (iterator.hasNext()) {
                 Object[] next = iterator.next();
                 if ((Integer) next[0] == seq) {
                     iterator.remove();
-                    return;
+                    return true;
                 }
             }
         }
+        return false;
     }
 
 
@@ -550,7 +619,10 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         return socket.getLocalPort();
     }
 
-
+    @Override
+    public int getPing() {
+        return currentPing;
+    }
 
     /* UTILS */
 
@@ -619,6 +691,13 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         return new byte[]{settings, 0, 0, 0, 0};
     }
 
+    private static byte[] buildPing(int seq) {
+        byte[] ret = new byte[5];
+        ret[0] = (byte) ((1 << IS_RELIABLE_POS) + (1<< IS_REQUEST_POS) + (1 << PING_POS));
+        putInt(ret, seq, 1);
+        return ret;
+    }
+
     private static void markAsSent(byte[] packageWithSettings){
         byte settings = packageWithSettings[0];
         if ((settings >> ALREADY_SENT_POS & 1) != 1){
@@ -664,9 +743,10 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         builder.append(settings[IS_RELIABLE_POS] ? "+" : "-").append("reliable ");
         builder.append(settings[IS_CONNECTION_POS] ? "+" : "-").append("isConnection ");
         builder.append(settings[IS_REQUEST_POS] ? "+" : "-").append("isRequest ");
-        builder.append(settings[ALREADY_SENT_POS] ? "+" : "-").append("alreadySent");
-        builder.append(settings[CONNECTION_RESP_POS] ? "+" : "-").append("isConResp");
-        builder.append(settings[DC_POS] ? "+" : "-").append("DC");
+        builder.append(settings[ALREADY_SENT_POS] ? "+" : "-").append("alreadySent ");
+        builder.append(settings[CONNECTION_RESP_POS] ? "+" : "-").append("isConResp ");
+        builder.append(settings[DC_POS] ? "+" : "-").append("DC ");
+        builder.append(settings[PING_POS] ? "+" : "-").append("PING ");
         return builder.toString();
     }
 
