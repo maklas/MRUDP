@@ -6,10 +6,10 @@ public interface ServerModel {
 
     byte[] validateNewConnection(InetAddress address, int port, byte[] userData);
 
-    void registerNewConnection(FixedBufferMRUDP2 socket);
+    void registerNewConnection(MRUDPSocketImpl socket);
 
     void handleUnknownSourceMsg(byte[] userData);
 
-    void onSocketDisconnected(FixedBufferMRUDP2 socket);
+    void onSocketDisconnected(MRUDPSocketImpl socket);
 
 }

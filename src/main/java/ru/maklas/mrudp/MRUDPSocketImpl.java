@@ -1,7 +1,5 @@
 package ru.maklas.mrudp;
 
-import ru.maklas.mrudp.impl.JavaUDPSocket;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -12,7 +10,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
+public class MRUDPSocketImpl implements MRUDPSocket2, SocketIterator {
 
     static final int IS_RELIABLE_POS = 0;
     static final int IS_CONNECTION_POS = 1;
@@ -56,11 +54,11 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private volatile int currentPing = 0;
     private Object userData = null;
 
-    public FixedBufferMRUDP2(int bufferSize) throws Exception{
+    public MRUDPSocketImpl(int bufferSize) throws Exception{
         this(new JavaUDPSocket(), bufferSize, 12 * 1000);
     }
 
-    public FixedBufferMRUDP2(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
+    public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
         socket = dSocket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
@@ -69,7 +67,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         lastCommunicationTime = System.currentTimeMillis();
     }
 
-    FixedBufferMRUDP2(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect, int dcTimeDueToInactivity) {
+    MRUDPSocketImpl(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect, int dcTimeDueToInactivity) {
         this.socket = socket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);

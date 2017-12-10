@@ -1,7 +1,5 @@
 package ru.maklas.mrudp;
 
-import ru.maklas.mrudp.impl.JavaUDPSocket;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -13,7 +11,7 @@ public class MRUDPServerSocket {
     private int socketIdCounter = 0;
     private final UDPSocket socket;
     private final ServerModel model;
-    private final HashMap<Long, FixedBufferMRUDP2> connectionMap = new HashMap<Long, FixedBufferMRUDP2>();
+    private final HashMap<Long, MRUDPSocketImpl> connectionMap = new HashMap<Long, MRUDPSocketImpl>();
     private final DatagramPacket datagramPacket;
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
@@ -48,19 +46,19 @@ public class MRUDPServerSocket {
                         byte[] data = new byte[dataLength];
                         System.arraycopy(packet.getData(), 0, data, 0, dataLength);
 
-                        FixedBufferMRUDP2 fixedBufferMRUDP2;
+                        MRUDPSocketImpl MRUDPSocketImpl;
                         synchronized (connectionMap) {
-                            fixedBufferMRUDP2 = connectionMap.get(addressHash(remoteAddress, remotePort));
+                            MRUDPSocketImpl = connectionMap.get(addressHash(remoteAddress, remotePort));
                         }
                         {
                             String s = new String(data, 5, dataLength - 5);
                             if (s.length() != 0) {
-                                //System.out.println("Data: " + s + ", from " + remoteAddress.getHostAddress() + ":" + remotePort + ". " + (fixedBufferMRUDP2 == null ? "ERRRRRRRRRRRRRRRRR" : "OK"));
+                                //System.out.println("Data: " + s + ", from " + remoteAddress.getHostAddress() + ":" + remotePort + ". " + (MRUDPSocketImpl == null ? "ERRRRRRRRRRRRRRRRR" : "OK"));
                             }
                         }
 
-                        if (fixedBufferMRUDP2 != null){
-                            fixedBufferMRUDP2.receive(remoteAddress, remotePort, data);
+                        if (MRUDPSocketImpl != null){
+                            MRUDPSocketImpl.receive(remoteAddress, remotePort, data);
                             continue;
                         } else {
                             if (dataLength < 5){
@@ -68,8 +66,8 @@ public class MRUDPServerSocket {
                                 continue;
                             }
                             boolean[] settings = getSettings(data[0]);
-                            boolean isConnection = settings[FixedBufferMRUDP2.IS_CONNECTION_POS];
-                            boolean isRequest = settings[FixedBufferMRUDP2.IS_REQUEST_POS];
+                            boolean isConnection = settings[MRUDPSocketImpl.IS_CONNECTION_POS];
+                            boolean isRequest = settings[MRUDPSocketImpl.IS_REQUEST_POS];
 
                             if (isConnection && isRequest){
                                 dealWithNewConnectionRequest(remoteAddress, remotePort, data);
@@ -109,7 +107,7 @@ public class MRUDPServerSocket {
                 validationResponse = new byte[]{0};
             }
             sendConnectionResponse(address, port, socketSeq, true, validationResponse);
-            final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse, dcTimeDueToInactivity);
+            final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse, dcTimeDueToInactivity);
             connectionMap.put(addressHash(address, port), socket);
             socket.addListener(new MRUDPListener() {
                 @Override
@@ -128,7 +126,7 @@ public class MRUDPServerSocket {
         DatagramPacket sendingPacket = this.sendingPacket;
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
-        sendingPacket.setData(FixedBufferMRUDP2.buildConnectionResponse(seq, acceptance, responseData));
+        sendingPacket.setData(MRUDPSocketImpl.buildConnectionResponse(seq, acceptance, responseData));
         try {
             socket.send(sendingPacket);
         } catch (Throwable e) {

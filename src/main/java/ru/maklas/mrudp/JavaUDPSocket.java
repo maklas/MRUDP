@@ -1,6 +1,4 @@
-package ru.maklas.mrudp.impl;
-
-import ru.maklas.mrudp.UDPSocket;
+package ru.maklas.mrudp;
 
 import java.io.IOException;
 import java.net.DatagramPacket;

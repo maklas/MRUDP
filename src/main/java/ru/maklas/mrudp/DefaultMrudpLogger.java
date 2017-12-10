@@ -1,7 +1,4 @@
-package ru.maklas.mrudp.impl;
-
-import ru.maklas.mrudp.MrudpLogger;
-import ru.maklas.mrudp.Request;
+package ru.maklas.mrudp;
 
 public class DefaultMrudpLogger implements MrudpLogger {
 
@@ -13,11 +10,6 @@ public class DefaultMrudpLogger implements MrudpLogger {
     @Override
     public void log(Exception e) {
         e.printStackTrace();
-    }
-
-    @Override
-    public void logRetry(Request request) {
-        System.err.println("Retry for: " + request + " #" + request.getTimesRequested());
     }
 
     @Override
