@@ -26,6 +26,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private InetAddress connectingToAddress = null;
     private int connectingToPort = -1;
     private volatile byte[] connectingResponse = null;
+    private volatile byte[] connectingRequest = null;
     private final AtomicInteger seq = new AtomicInteger(0);
     private final UDPSocket socket;
     private final DatagramPacket receivingPacket;
@@ -40,6 +41,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private MRUDPListener[] listeners = new MRUDPListener[0];
 
     private boolean createdByServer = false;
+    private byte[] responseForConnect = new byte[]{000};
 
     public FixedBufferMRUDP2(UDPSocket dSocket, int bufferSize) {
         socket = dSocket;
@@ -48,15 +50,17 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         createdByServer = false;
     }
 
-    FixedBufferMRUDP2(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq) {
+    FixedBufferMRUDP2(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect) {
         this.socket = socket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        this.responseForConnect = responseForConnect;
         this.createdByServer = true;
         this.lastConnectedAddress = connectedAddress;
         this.lastConnectedPort = connectedPort;
         this.lastInsertedSeq = expectSeq;
         this.seq.set(socketSeq);
+        this.state.set(SocketState.CONNECTED);
     }
 
     @Override
@@ -77,9 +81,11 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         connectingToAddress = address;
         connectingToPort = port;
         connectingResponse = null;
+        seq.set(0);
         final int serverSequenceNumber = 0;
 
-        byte[] fullData = buildConnectionRequest(0, serverSequenceNumber, data);
+        byte[] fullData = buildConnectionRequest(seq.getAndIncrement(), serverSequenceNumber, data);
+        connectingRequest = fullData;
         sendData(address, port, fullData);
         final Future<byte[]> futureResponse = e.submit(new Callable<byte[]>() {
             @Override
@@ -101,34 +107,34 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         } catch (ExecutionException e1) {
             e1.printStackTrace();
         } catch (TimeoutException e1) {
-            e1.printStackTrace();
+            //when time exceeds
         } catch (CancellationException e1){
             e1.printStackTrace();
         }
 
         if (bytes == null || bytes.length < 5){
             state.set(SocketState.NOT_CONNECTED);
+            connectingToAddress = null;
             return new ConnectionResponse(ConnectionResponse.Type.NO_RESPONSE, new byte[0]);
         }
 
         boolean[] settings = getSettings(bytes[0]);
         boolean accepted = settings[CONNECTION_RESP_POS];
-        byte[] respData = new byte[bytes.length - 5];
-        System.arraycopy(bytes, 0, respData, 0, respData.length);
-        ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, respData);
+        ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, bytes);
         if (accepted) {
             state.set(SocketState.CONNECTED);
             lastInsertedSeq = serverSequenceNumber;
         }
         lastConnectedAddress = address;
         lastConnectedPort = port;
+        connectingToAddress = null;
         return connectionResponse;
     }
 
     @Override
     public boolean send(byte[] data) {
         if (isConnected()) {
-            int seq = this.seq.getAndDecrement();
+            int seq = this.seq.getAndIncrement();
             byte[] fullPackage = buildPackage(seq, true, false, data);
             saveRequest(seq, fullPackage);
             sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
@@ -164,6 +170,9 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                         int dataLength = packet.getLength();
                         byte[] data = new byte[dataLength];
                         System.arraycopy(packet.getData(), 0, data, 0, dataLength);
+                        if (!getSettings(data[0])[IS_CONNECTION_POS])
+                            System.out.println(getSettingsAsString(data[0]) + "  " + exctractInt(data, 1) + "   " +  new String(data, 5, dataLength - 5));
+
                         if (remoteAddress.equals(lastConnectedAddress) && remotePort == lastConnectedPort && isConnected()){
                             receive(remoteAddress, remotePort, data);
                         } else {
@@ -190,8 +199,8 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                 public void run() {
                     while (!Thread.interrupted()) {
                         try {
-                            update();
                             Thread.sleep(updateThreadSleepTimeMS);
+                            update();
                         } catch (InterruptedException interruption) {
                             break;
                         }
@@ -208,18 +217,30 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
     @Override
     public void update() {
-        if (!isConnected()) {
-            return;
+        SocketState socketState = state.get();
+
+        switch (socketState){
+            case CONNECTING:
+                InetAddress connectAddress = connectingToAddress;
+                int connectPort = connectingToPort;
+                byte[] fullConnectData = connectingRequest;
+                if (connectAddress != null && fullConnectData != null){
+                    sendData(connectAddress, connectPort, fullConnectData);
+                }
+                break;
+            case CONNECTED:
+                synchronized (requestList) {
+                    Iterator<Object[]> savedRequests = requestList.iterator();
+                    while (savedRequests.hasNext()) {
+                        byte[] fullDataReq = (byte[]) savedRequests.next()[1];
+                        markAsSent(fullDataReq);
+                        sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
+                    }
+                }
+                break;
         }
 
-        synchronized (requestList) {
-            Iterator<Object[]> savedRequests = requestList.iterator();
-            while (savedRequests.hasNext()) {
-                byte[] fullDataReq = (byte[]) savedRequests.next()[1];
-                markAsSent(fullDataReq);
-                sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
-            }
-        }
+
     }
 
     @Override
@@ -293,7 +314,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         } catch (Throwable t){
             log(t);
         }
-        processing = true;
+        processing = false;
     }
 
 
@@ -318,7 +339,6 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     }
 
     void receive(InetAddress address, int port, byte[] fullPackage){
-
         if (fullPackage.length < 5){
             log("Received message less than 5 bytes long!");
             return;
@@ -360,6 +380,10 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         boolean isRequest = settings[IS_REQUEST_POS];
         if (isRequest){
             log("Attempt to login on MRUDP socket!");
+            if (createdByServer){
+                byte[] response = buildConnectionResponse(seq, true, responseForConnect);
+                sendData(address, port, response);
+            }
             return;
         }
 
@@ -375,15 +399,16 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private void dealWithRequest(InetAddress address, int port, int seq, boolean alreadySent, byte[] fullPackage) {
         byte[] responseData = buildResponse(seq);
         sendData(address, port, responseData);
-        int expectedSeq = this.lastInsertedSeq + 1;
-        if (expectedSeq < seq){
-
+        final int expectedSeq = this.lastInsertedSeq + 1;
+        if (expectedSeq > seq){
         } else
-        if (expectedSeq + 1 == seq){
-            insert(seq, fullPackage, 5);
+        if (expectedSeq == seq){
+            insert(expectedSeq, fullPackage, 5);
             checkForQueuedDatas();
         } else {
-            insertIntoQueuedDatas(seq, fullPackage);
+            byte[] userData = new byte[fullPackage.length - 5];
+            System.arraycopy(fullPackage, 5, userData, 0, userData.length);
+            insertIntoWaitingDatas(seq, userData);
         }
     }
 
@@ -418,26 +443,31 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     private void checkForQueuedDatas() {
         int expectedSeq;
         boolean madeIt = true;
-        while (madeIt){
-            madeIt = false;
-            expectedSeq = lastInsertedSeq + 1;
 
-            for (Object[] pair : waitings) {
-                if (((Integer)pair[0]) == expectedSeq){
-                    insert(expectedSeq, (byte[])pair[1]);
-                    madeIt = true;
-                    continue;
+        synchronized (waitings) {
+            while (madeIt) {
+                madeIt = false;
+                expectedSeq = lastInsertedSeq + 1;
+
+                for (Object[] pair : waitings) {
+                    if (((Integer) pair[0]) == expectedSeq) {
+                        insert(expectedSeq, (byte[]) pair[1]);
+                        madeIt = true;
+                        continue;
+                    }
                 }
-            }
 
+            }
         }
 
     }
 
     private void insert(int seq, byte[] fullData, int offset){
+        int old = lastInsertedSeq;
         this.lastInsertedSeq = seq;
         byte[] userData = new byte[fullData.length - offset];
         System.arraycopy(fullData, offset, userData, 0, userData.length);
+        System.out.println("Inserting: " + new String(userData) + " under seq: " + seq + " old seq: " + old);
         userDatas.offer(userData);
     }
 
@@ -447,13 +477,15 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     }
 
     private final ArrayList<Object[]> waitings = new ArrayList<Object[]>(); //<Integer.class, byte[].class>
-    private void insertIntoQueuedDatas(int seq, byte[] fullPackage) {
-        for (Object[] pair : waitings) {
-            if (((Integer)pair[0]) == seq){
-                return;
+    private void insertIntoWaitingDatas(int seq, byte[] fullPackage) {
+        synchronized (waitings) {
+            for (Object[] pair : waitings) {
+                if (((Integer) pair[0]) == seq) {
+                    return;
+                }
             }
+            waitings.add(new Object[]{Integer.valueOf(seq), fullPackage});
         }
-        waitings.add(new Object[]{Integer.valueOf(seq), fullPackage});
     }
 
     private final ArrayList<Object[]> requestList = new ArrayList<Object[]>();
@@ -618,15 +650,19 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     }
 
     public static void printSettings(byte settingsByte){
-        boolean[] settings = getSettings(settingsByte);
+        System.out.println(getSettingsAsString(settingsByte));
+    }
+
+    public static String getSettingsAsString(byte settingsBytes){
+        boolean[] settings = getSettings(settingsBytes);
         StringBuilder builder = new StringBuilder("Settings: ");
         builder.append(settings[IS_RELIABLE_POS] ? "+" : "-").append("reliable ");
         builder.append(settings[IS_CONNECTION_POS] ? "+" : "-").append("isConnection ");
-        builder.append(settings[IS_REQUEST_POS] ? "+" : "-").append("isResponse ");
+        builder.append(settings[IS_REQUEST_POS] ? "+" : "-").append("isRequest ");
         builder.append(settings[ALREADY_SENT_POS] ? "+" : "-").append("alreadySent");
         builder.append(settings[CONNECTION_RESP_POS] ? "+" : "-").append("isConResp");
         builder.append(settings[DC_POS] ? "+" : "-").append("DC");
-        System.out.println(builder.toString());
+        return builder.toString();
     }
 
 }

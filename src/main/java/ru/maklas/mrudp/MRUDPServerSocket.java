@@ -91,7 +91,7 @@ public class MRUDPServerSocket {
         int expectSeq = exctractInt(fullData, 5);
         if (isValid){
             sendConnectionResponse(address, port, socketSeq, true, validationResponse);
-            final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq);
+            final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse);
             socket.addListener(new MRUDPListener() {
                 @Override
                 public void onDisconnect(MRUDPSocket2 fixedBufferMRUDP2) {
@@ -109,7 +109,6 @@ public class MRUDPServerSocket {
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
         sendingPacket.setData(FixedBufferMRUDP2.buildConnectionResponse(seq, acceptance, responseData));
-        FixedBufferMRUDP2.printSettings(sendingPacket.getData()[0]);
         try {
             socket.send(sendingPacket);
         } catch (Throwable e) {
