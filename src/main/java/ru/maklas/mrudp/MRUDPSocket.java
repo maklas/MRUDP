@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 import java.net.InetAddress;
 
-public interface MRUDPSocket2 {
+public interface MRUDPSocket {
 
     enum SocketState {NOT_CONNECTED, CONNECTING, CONNECTED}
 

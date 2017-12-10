@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class MRUDPSocketImpl implements MRUDPSocket2, SocketIterator {
+public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     static final int IS_RELIABLE_POS = 0;
     static final int IS_CONNECTION_POS = 1;

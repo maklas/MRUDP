@@ -111,7 +111,7 @@ public class MRUDPServerSocket {
             connectionMap.put(addressHash(address, port), socket);
             socket.addListener(new MRUDPListener() {
                 @Override
-                public void onDisconnect(MRUDPSocket2 fixedBufferMRUDP2) {
+                public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
                     connectionMap.remove(addressHash(fixedBufferMRUDP2.getRemoteAddress(), fixedBufferMRUDP2.getRemotePort()));
                     model.onSocketDisconnected(socket);
                 }
