@@ -83,6 +83,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         connectingResponse = null;
         seq.set(0);
         final int serverSequenceNumber = 0;
+        lastInsertedSeq = serverSequenceNumber;
 
         byte[] fullData = buildConnectionRequest(seq.getAndIncrement(), serverSequenceNumber, data);
         connectingRequest = fullData;
@@ -123,7 +124,6 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, bytes);
         if (accepted) {
             state.set(SocketState.CONNECTED);
-            lastInsertedSeq = serverSequenceNumber;
         }
         lastConnectedAddress = address;
         lastConnectedPort = port;
@@ -155,43 +155,48 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
     public void start(boolean startUpdateThread, final int updateThreadSleepTimeMS){
 
-        final Thread recevingThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
+        if (!createdByServer) {
+            final Thread recevingThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (!Thread.interrupted()) {
 
-                while (!Thread.interrupted()) {
+                        try {
+                            DatagramPacket packet = receivingPacket;
+                            socket.receive(packet);
 
-                    try {
-                        DatagramPacket packet = receivingPacket;
-                        socket.receive(packet);
-
-                        InetAddress remoteAddress = packet.getAddress();
-                        int remotePort = packet.getPort();
-                        int dataLength = packet.getLength();
-                        byte[] data = new byte[dataLength];
-                        System.arraycopy(packet.getData(), 0, data, 0, dataLength);
-                        if (!getSettings(data[0])[IS_CONNECTION_POS])
-                            System.out.println(getSettingsAsString(data[0]) + "  " + exctractInt(data, 1) + "   " +  new String(data, 5, dataLength - 5));
-
-                        if (remoteAddress.equals(lastConnectedAddress) && remotePort == lastConnectedPort && isConnected()){
-                            receive(remoteAddress, remotePort, data);
-                        } else {
-                            if (remoteAddress.equals(connectingToAddress) && remotePort == connectingToPort && (state.get() == SocketState.CONNECTING)){
-                                receive(remoteAddress, remotePort, data);
+                            InetAddress remoteAddress = packet.getAddress();
+                            int remotePort = packet.getPort();
+                            int dataLength = packet.getLength();
+                            byte[] data = new byte[dataLength];
+                            System.arraycopy(packet.getData(), 0, data, 0, dataLength);
+                            if (!getSettings(data[0])[IS_CONNECTION_POS]) {
+                                if (new String(data, 5, dataLength - 5).startsWith("2 hey")) {
+                                    //System.out.println(name + " --- lastInsertedSEQ=" + lastInsertedSeq + ", " + getSettingsAsString(data[0]) + ",  " + exctractInt(data, 1) + ",   " +  new String(data, 5, dataLength - 5));
+                                }
                             }
-                        }
+                            if (remoteAddress.equals(lastConnectedAddress) && remotePort == lastConnectedPort && isConnected()) {
+                                receive(remoteAddress, remotePort, data);
+                            } else {
+                                if (remoteAddress.equals(connectingToAddress) && remotePort == connectingToPort && (state.get() == SocketState.CONNECTING)) {
+                                    receive(remoteAddress, remotePort, data);
+                                }
+                            }
 
-                    } catch (SocketException se) {
-                        log("Got SocketException in receiving thread. Quitting...");
-                        break;
-                    } catch (IOException e){
-                        log("IOE in receiving thread");
-                    } catch (Exception ex){
-                        log(ex);
+                        } catch (SocketException se) {
+                            log("Got SocketException in receiving thread. Quitting...");
+                            break;
+                        } catch (IOException e) {
+                            log("IOE in receiving thread");
+                        } catch (Exception ex) {
+                            log(ex);
+                        }
                     }
                 }
-            }
-        });
+            });
+
+            recevingThread.start();
+        }
 
         if (startUpdateThread) {
             final Thread updateThread = new Thread(new Runnable() {
@@ -199,8 +204,8 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
                 public void run() {
                     while (!Thread.interrupted()) {
                         try {
-                            Thread.sleep(updateThreadSleepTimeMS);
                             update();
+                            Thread.sleep(updateThreadSleepTimeMS);
                         } catch (InterruptedException interruption) {
                             break;
                         }
@@ -211,8 +216,6 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
 
             updateThread.start();
         }
-        //TODO save threads
-        recevingThread.start();
     }
 
     @Override
@@ -246,6 +249,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
     @Override
     public void close() {
         if (!isConnected()){
+            System.out.println("Closing, but not connected!");
             return;
         }
 
@@ -467,7 +471,7 @@ public class FixedBufferMRUDP2 implements MRUDPSocket2, SocketIterator {
         this.lastInsertedSeq = seq;
         byte[] userData = new byte[fullData.length - offset];
         System.arraycopy(fullData, offset, userData, 0, userData.length);
-        System.out.println("Inserting: " + new String(userData) + " under seq: " + seq + " old seq: " + old);
+        //System.out.println("Inserting: " + new String(userData) + " under seq: " + seq + " old seq: " + old);
         userDatas.offer(userData);
     }
 

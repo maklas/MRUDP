@@ -8,6 +8,7 @@ import java.util.HashMap;
 
 public class MRUDPServerSocket {
 
+    private int socketIdCounter = 0;
     private final UDPSocket socket;
     private final ServerModel model;
     private final HashMap<Long, FixedBufferMRUDP2> connectionMap = new HashMap<Long, FixedBufferMRUDP2>();
@@ -42,6 +43,12 @@ public class MRUDPServerSocket {
                         FixedBufferMRUDP2 fixedBufferMRUDP2;
                         synchronized (connectionMap) {
                             fixedBufferMRUDP2 = connectionMap.get(addressHash(remoteAddress, remotePort));
+                        }
+                        {
+                            String s = new String(data, 5, dataLength - 5);
+                            if (s.length() != 0) {
+                                //System.out.println("Data: " + s + ", from " + remoteAddress.getHostAddress() + ":" + remotePort + ". " + (fixedBufferMRUDP2 == null ? "ERRRRRRRRRRRRRRRRR" : "OK"));
+                            }
                         }
 
                         if (fixedBufferMRUDP2 != null){
@@ -92,6 +99,7 @@ public class MRUDPServerSocket {
         if (isValid){
             sendConnectionResponse(address, port, socketSeq, true, validationResponse);
             final FixedBufferMRUDP2 socket = new FixedBufferMRUDP2(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse);
+            connectionMap.put(addressHash(address, port), socket);
             socket.addListener(new MRUDPListener() {
                 @Override
                 public void onDisconnect(MRUDPSocket2 fixedBufferMRUDP2) {
