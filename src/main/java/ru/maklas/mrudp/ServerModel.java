@@ -4,9 +4,9 @@ import java.net.InetAddress;
 
 public interface ServerModel {
 
-    byte[] validateNewConnection(InetAddress address, int port, byte[] userData);
+    ConnectionResponsePackage<byte[]> validateNewConnection(InetAddress address, int port, byte[] userData);
 
-    void registerNewConnection(MRUDPSocketImpl socket);
+    void registerNewConnection(MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage);
 
     void handleUnknownSourceMsg(byte[] userData);
 

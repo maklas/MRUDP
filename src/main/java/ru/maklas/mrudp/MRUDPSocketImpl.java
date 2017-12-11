@@ -146,10 +146,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         if (accepted) {
             state.set(SocketState.CONNECTED);
         }
-        lastPingSendTime = System.currentTimeMillis();
-        lastConnectedAddress = address;
-        lastConnectedPort = port;
-        connectingToAddress = null;
+        long currentTime = System.currentTimeMillis();
+        this.lastCommunicationTime = currentTime;
+        this.lastPingSendTime = currentTime;
+        this.lastConnectedAddress = address;
+        this.lastConnectedPort = port;
+        this.connectingToAddress = null;
         return connectionResponse;
     }
 
@@ -445,19 +447,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private void dealWithNewConnectionResponse(InetAddress address, int port, int seq, boolean[] settings, byte[] fullPackage) {
         boolean isRequest = settings[IS_REQUEST_POS];
-        if (isRequest){
-            log("Attempt to login on MRUDP socket!");
-            if (createdByServer){
-                byte[] response = buildConnectionResponse(seq, true, responseForConnect);
-                sendData(address, port, response);
-            }
+        if (isRequest && createdByServer){
+            byte[] response = buildConnectionResponse(seq, true, responseForConnect);
+            sendData(address, port, response);
             return;
         }
 
-        if (address.equals(connectingToAddress) && port == connectingToPort){
-            if (state.get() == SocketState.CONNECTING) {
-                this.connectingResponse = fullPackage;
-            }
+        if (address.equals(connectingToAddress) && port == connectingToPort && state.get() == SocketState.CONNECTING){
+            this.connectingResponse = fullPackage;
         }
     }
 

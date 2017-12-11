@@ -97,17 +97,20 @@ public class MRUDPServerSocket {
         int fullDataLength = fullData.length;
         byte[] userData = new byte[fullDataLength - 9];
         System.arraycopy(fullData, 9, userData, 0, userData.length);
-        byte[] validationResponse = model.validateNewConnection(address, port, userData);
 
-        boolean isValid = validationResponse != null;
+        ConnectionResponsePackage<byte[]> connectionResponsePackage = model.validateNewConnection(address, port, userData);
+        boolean isValid = connectionResponsePackage.accepted();
+        byte[] response = connectionResponsePackage.getResponseData();
+
+        if (response == null){
+            throw new NullPointerException();
+        }
+
         int socketSeq = exctractInt(fullData, 1);
         int expectSeq = exctractInt(fullData, 5);
         if (isValid){
-            if (validationResponse.length == 0){
-                validationResponse = new byte[]{0};
-            }
-            sendConnectionResponse(address, port, socketSeq, true, validationResponse);
-            final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, validationResponse, dcTimeDueToInactivity);
+            sendConnectionResponse(address, port, socketSeq, true, response);
+            final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, response, dcTimeDueToInactivity);
             connectionMap.put(addressHash(address, port), socket);
             socket.addListener(new MRUDPListener() {
                 @Override
@@ -121,9 +124,9 @@ public class MRUDPServerSocket {
 
                 }
             });
-            model.registerNewConnection(socket);
+            model.registerNewConnection(socket, connectionResponsePackage);
         } else {
-            sendConnectionResponse(address, port, socketSeq, false, new byte[]{0, 0, 0, 0});
+            sendConnectionResponse(address, port, socketSeq, false, response);
         }
     }
 
