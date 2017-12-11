@@ -322,18 +322,22 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     public void removeListeners(MRUDPListener listener) {
         MRUDPListener[] listeners = this.listeners;
         int length = listeners.length;
-        MRUDPListener[] newListeners = new MRUDPListener[length];
 
-        int aliveCounter = 0;
         for (int i = 0; i < length; i++) {
-            if (listeners[i] != listener){
-                newListeners[aliveCounter++] = listeners[i];
+            if (listeners[i] == listener){
+
+                MRUDPListener[] newListeners = new MRUDPListener[length-1];
+
+                int aliveCounter = 0;
+                for (int j = 0; j < length; j++) {
+                    if (listeners[i] != listener){
+                        newListeners[aliveCounter++] = listeners[i];
+                    }
+                }
+                this.listeners = newListeners;
+                return;
             }
         }
-        if (aliveCounter == length){
-            return;
-        }
-        this.listeners = newListeners;
     }
 
     @Override
