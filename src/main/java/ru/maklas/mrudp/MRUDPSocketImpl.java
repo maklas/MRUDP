@@ -397,6 +397,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void sendData(InetAddress address, int port, byte[] fullPackage){
+        boolean[] settings = getSettings(fullPackage[0]);
+        if (settings[IS_RELIABLE_POS] && !settings[IS_REQUEST_POS]){
+            System.out.println("WTF");
+        }
         synchronized (sendingMonitor) {
             sendingPacket.setAddress(address);
             sendingPacket.setPort(port);
