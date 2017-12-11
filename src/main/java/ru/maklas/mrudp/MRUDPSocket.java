@@ -30,6 +30,8 @@ public interface MRUDPSocket {
 
     void setUserData(Object userData);
 
+    int getCurrentSeq();
+
 
     // GETTERS
 

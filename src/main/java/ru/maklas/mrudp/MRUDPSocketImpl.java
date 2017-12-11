@@ -37,6 +37,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
     private int lastInsertedSeq = 0;
 
+    private volatile boolean started = false;
     private boolean interrupted = false;
     private volatile boolean processing = false;
     private MRUDPListener[] listeners = new MRUDPListener[0];
@@ -181,6 +182,11 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     public void start(boolean startUpdateThread, final int updateThreadSleepTimeMS){
+        if (started){
+            System.err.println("Double start registered");
+            return;
+        }
+        started = true;
 
         if (!createdByServer) {
             final Thread recevingThread = new Thread(new Runnable() {
@@ -202,7 +208,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                             } else {
                                 if (remoteAddress.equals(connectingToAddress) && remotePort == connectingToPort && (state.get() == SocketState.CONNECTING)) {
                                     boolean[] settings = getSettings(data[0]);
-                                    if (settings[IS_CONNECTION_POS] && !settings[IS_REQUEST_POS]) {
+                                    if (settings[IS_CONNECTION_POS]) {
                                         receive(remoteAddress, remotePort, data);
                                     }
                                 }
@@ -397,6 +403,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void sendData(InetAddress address, int port, byte[] fullPackage){
+
         boolean[] settings = getSettings(fullPackage[0]);
         if (settings[IS_RELIABLE_POS] && !settings[IS_REQUEST_POS] && fullPackage.length > 5){
             System.out.println("WTF");
@@ -423,7 +430,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         int seq = exctractInt(fullPackage, 1);
 
         if (settings[IS_CONNECTION_POS]){
-            dealWithNewConnectionResponse(address, port, seq, settings, fullPackage);
+            dealWithConnection(address, port, seq, settings, fullPackage);
             return;
         }
 
@@ -452,7 +459,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     /* PACKET DEALS */
 
-    private void dealWithNewConnectionResponse(InetAddress address, int port, int seq, boolean[] settings, byte[] fullPackage) {
+    private void dealWithConnection(InetAddress address, int port, int seq, boolean[] settings, byte[] fullPackage) {
         boolean isRequest = settings[IS_REQUEST_POS];
         if (isRequest && createdByServer){
             byte[] response = buildConnectionResponse(seq, true, responseForConnect);
@@ -639,6 +646,11 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     @Override
     public void setUserData(Object userData) {
         this.userData = userData;
+    }
+
+    @Override
+    public int getCurrentSeq() {
+        return seq.get();
     }
 
     @Override
