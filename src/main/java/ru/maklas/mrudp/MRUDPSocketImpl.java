@@ -498,7 +498,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
         boolean removed = removeRequest(seq);
         if (removed && lastPingSeq == seq){
-            currentPing = (int) (System.currentTimeMillis() - lastPingSendTime);
+            int newPing = (int) (System.currentTimeMillis() - lastPingSendTime);
+            this.currentPing = newPing;
+            MRUDPListener[] listeners = this.listeners;
+            for (int i = 0; i < listeners.length; i++) {
+                listeners[i].onPingUpdated(newPing);
+            }
         }
     }
 

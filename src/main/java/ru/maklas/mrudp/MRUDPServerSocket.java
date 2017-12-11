@@ -115,6 +115,11 @@ public class MRUDPServerSocket {
                     connectionMap.remove(addressHash(fixedBufferMRUDP2.getRemoteAddress(), fixedBufferMRUDP2.getRemotePort()));
                     model.onSocketDisconnected(socket);
                 }
+
+                @Override
+                public void onPingUpdated(int newPing) {
+
+                }
             });
             model.registerNewConnection(socket);
         } else {

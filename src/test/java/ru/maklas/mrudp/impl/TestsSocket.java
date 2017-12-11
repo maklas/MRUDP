@@ -209,7 +209,7 @@ public class TestsSocket implements ServerModel {
             }
 
             @Override
-            public void registerNewConnection(FixedBufferMRUDP2 socket) {
+            public void registerNewConnection(FixedBufferMRUDP socket) {
                 socket.start(true, 50);
                 new ClientThread("server bean", socket).start();
             }
@@ -220,7 +220,7 @@ public class TestsSocket implements ServerModel {
             }
 
             @Override
-            public void onSocketDisconnected(FixedBufferMRUDP2 socket) {
+            public void onSocketDisconnected(FixedBufferMRUDP socket) {
                 System.out.println("Server DC");
             }
         }, 12000);
