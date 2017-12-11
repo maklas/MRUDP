@@ -95,8 +95,8 @@ public class MRUDPServerSocket {
 
     private void dealWithNewConnectionRequest(InetAddress address, int port, byte[] fullData) {
         int fullDataLength = fullData.length;
-        byte[] userData = new byte[fullDataLength - 5];
-        System.arraycopy(fullData, 5, userData, 0, userData.length);
+        byte[] userData = new byte[fullDataLength - 9];
+        System.arraycopy(fullData, 9, userData, 0, userData.length);
         byte[] validationResponse = model.validateNewConnection(address, port, userData);
 
         boolean isValid = validationResponse != null;
