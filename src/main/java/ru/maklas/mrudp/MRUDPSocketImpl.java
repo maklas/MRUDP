@@ -92,7 +92,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             throw new NullPointerException();
         }
 
-        if (state.get() != SocketState.NOT_CONNECTED){
+        SocketState stateAtTheBeginning = state.get();
+        if (stateAtTheBeginning != SocketState.NOT_CONNECTED){
             return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, new byte[0]);
         }
         state.set(SocketState.CONNECTING);
@@ -145,6 +146,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, userData);
         if (accepted) {
             state.set(SocketState.CONNECTED);
+        } else {
+            state.set(SocketState.NOT_CONNECTED);
         }
         long currentTime = System.currentTimeMillis();
         this.lastCommunicationTime = currentTime;
@@ -491,7 +494,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void dealWithResponse(int seq, byte[] fullPackage) {
         int responseLength = fullPackage.length;
         if (responseLength != 5){
-            log("Uexpected response length: " + responseLength);
+            log("Unexpected response length: " + responseLength);
         }
         boolean removed = removeRequest(seq);
         if (removed && lastPingSeq == seq){
