@@ -733,7 +733,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private static byte[] buildPingResponse (int seq, long startTime){
         byte[] timeAsBytes = new byte[8];
         putLong(timeAsBytes, startTime, 0);
-        return build5byte(pingResponse, seq);
+        return build5byte(pingResponse, seq, timeAsBytes);
     }
 
     static byte[] buildConnectionRequest (int seq, int otherSeq, byte[] data){
