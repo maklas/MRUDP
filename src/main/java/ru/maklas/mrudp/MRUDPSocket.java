@@ -14,7 +14,7 @@ public interface MRUDPSocket {
 
     boolean sendUnreliable(byte[] data);
 
-    void start(boolean startUpdateThread, final int updateThreadSleepTimeMS);
+    void start(final int updateThreadSleepTimeMS);
 
     void update();
 
@@ -47,7 +47,7 @@ public interface MRUDPSocket {
 
     boolean isProcessing();
 
-    int getPing();
+    float getPing();
 
     Object getUserData();
 

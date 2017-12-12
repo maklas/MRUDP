@@ -46,30 +46,20 @@ public class MRUDPServerSocket {
                         byte[] data = new byte[dataLength];
                         System.arraycopy(packet.getData(), 0, data, 0, dataLength);
 
-                        MRUDPSocketImpl MRUDPSocketImpl;
+                        MRUDPSocketImpl subSocket;
                         synchronized (connectionMap) {
-                            MRUDPSocketImpl = connectionMap.get(addressHash(remoteAddress, remotePort));
-                        }
-                        {
-                            String s = new String(data, 5, dataLength - 5);
-                            if (s.length() != 0) {
-                                //System.out.println("Data: " + s + ", from " + remoteAddress.getHostAddress() + ":" + remotePort + ". " + (MRUDPSocketImpl == null ? "ERRRRRRRRRRRRRRRRR" : "OK"));
-                            }
+                            subSocket = connectionMap.get(addressHash(remoteAddress, remotePort));
                         }
 
-                        if (MRUDPSocketImpl != null){
-                            MRUDPSocketImpl.receive(remoteAddress, remotePort, data);
+                        if (subSocket != null){
+                            subSocket.receiveConnected(remoteAddress, remotePort, data);
                             continue;
                         } else {
                             if (dataLength < 5){
                                 log("Got message from unknown address less than 5 bytes long");
                                 continue;
                             }
-                            boolean[] settings = getSettings(data[0]);
-                            boolean isConnection = settings[MRUDPSocketImpl.IS_CONNECTION_POS];
-                            boolean isRequest = settings[MRUDPSocketImpl.IS_REQUEST_POS];
-
-                            if (isConnection && isRequest){
+                            if (data[0] == MRUDPSocketImpl.connectionRequest){
                                 dealWithNewConnectionRequest(remoteAddress, remotePort, data);
                             } else {
                                 byte[] userData = new byte[dataLength - 5];
@@ -106,8 +96,8 @@ public class MRUDPServerSocket {
             throw new NullPointerException();
         }
 
-        int socketSeq = exctractInt(fullData, 1);
-        int expectSeq = exctractInt(fullData, 5);
+        int socketSeq = MRUDPSocketImpl.extractInt(fullData, 1);
+        int expectSeq = MRUDPSocketImpl.extractInt(fullData, 5);
         if (isValid){
             sendConnectionResponse(address, port, socketSeq, true, response);
             final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, response, dcTimeDueToInactivity);
@@ -120,7 +110,7 @@ public class MRUDPServerSocket {
                 }
 
                 @Override
-                public void onPingUpdated(int newPing) {
+                public void onPingUpdated(float newPing) {
 
                 }
             });
@@ -134,7 +124,7 @@ public class MRUDPServerSocket {
         DatagramPacket sendingPacket = this.sendingPacket;
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
-        sendingPacket.setData(MRUDPSocketImpl.buildConnectionResponse(seq, acceptance, responseData));
+        sendingPacket.setData(MRUDPSocketImpl.buildConnectionResponse(acceptance, seq, responseData));
         try {
             socket.send(sendingPacket);
         } catch (Throwable e) {
@@ -161,24 +151,4 @@ public class MRUDPServerSocket {
         t.printStackTrace();
     }
 
-    private static boolean[] getSettings(byte setByte){
-        return new boolean[]{
-                ((setByte &  1)     == 1),
-                ((setByte >> 1 & 1) == 1),
-                ((setByte >> 2 & 1) == 1),
-                ((setByte >> 3 & 1) == 1),
-                ((setByte >> 4 & 1) == 1),
-                ((setByte >> 5 & 1) == 1),
-                ((setByte >> 6 & 1) == 1),
-                ((setByte >> 7 & 1) == 1)
-        };
-    }
-
-    private static int exctractInt(byte[] bytes, int offset){
-        return
-                bytes[offset] << 24             |
-                        (bytes[1 + offset] & 0xFF) << 16 |
-                        (bytes[2 + offset] & 0xFF) << 8  |
-                        (bytes[3 + offset] & 0xFF);
-    }
 }

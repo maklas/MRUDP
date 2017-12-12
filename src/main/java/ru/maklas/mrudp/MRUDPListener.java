@@ -4,5 +4,5 @@ public interface MRUDPListener {
 
     void onDisconnect(MRUDPSocket fixedBufferMRUDP2);
 
-    void onPingUpdated(int newPing);
+    void onPingUpdated(float newPing);
 }
