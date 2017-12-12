@@ -1,4 +1,4 @@
-package ru.maklas.mrudp.impl;
+package ru.maklas.mrudp;
 
 import ru.maklas.mrudp.UDPSocket;
 

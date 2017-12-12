@@ -1,6 +1,7 @@
-package ru.maklas.mrudp.impl;
+package ru.maklas.mrudp;
 
 import org.junit.Test;
+import org.junit.runners.JUnit4;
 import ru.maklas.mrudp.*;
 
 import java.net.InetAddress;
@@ -103,5 +104,26 @@ public class TestsSocket {
 
 
         Thread.sleep(2000);
+    }
+
+    @Test
+    public void putLong() throws Exception {
+
+        for (int i = 0; i < 5000; i++) {
+            Thread.sleep(1);
+            checkLong();
+        }
+
+    }
+
+    private void checkLong(){
+        byte[] buffer = new byte[8];
+
+        long nano = System.nanoTime();
+        MRUDPSocketImpl.putLong(buffer, nano, 0);
+        long extracted = MRUDPSocketImpl.extractLong(buffer, 0);
+        if (nano != extracted){
+            System.err.println("NOT EQUAL! Expected: " + nano + ", but got " + extracted);
+        }
     }
 }

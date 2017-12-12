@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.*;
@@ -269,7 +270,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 }
                 break;
             case CONNECTED:
-                long currTime = System.currentTimeMillis();
+                final long currTime = System.currentTimeMillis();
                 if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
                     receiveQueue.offer(new byte[0]);
                     return;
@@ -805,7 +806,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 (bytes[3 + offset] & 0xFF);
     }
 
-    private static void putLong(byte[] bytes, long value, int offset) {
+    static void putLong(byte[] bytes, long value, int offset) {
         bytes[    offset] = (byte) (value >>> 56);
         bytes[1 + offset] = (byte) (value >>> 48);
         bytes[2 + offset] = (byte) (value >>> 40);
@@ -816,10 +817,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         bytes[7 + offset] = (byte)  value;
     }
 
-    private static long extractLong(byte[] bytes, int offset){
-        long first = extractInt(bytes, offset);
-        long second = extractInt(bytes, offset + 4);
-        return second + (first << 32);
+    static long extractLong(byte[] bytes, int offset){
+        long result = 0;
+        for (int i = offset; i < 8 + offset; i++) {
+            result <<= 8;
+            result |= (bytes[i] & 0xFF);
+        }
+        return result;
     }
 
     public static void printSettings(byte settingsByte){
