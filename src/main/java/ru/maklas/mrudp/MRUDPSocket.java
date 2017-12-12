@@ -16,11 +16,7 @@ public interface MRUDPSocket {
 
     void start(final int updateThreadSleepTimeMS);
 
-    void update();
-
     void receive(SocketProcessor processor);
-
-    void close();
 
     void addListener(MRUDPListener listener);
 
@@ -32,6 +28,9 @@ public interface MRUDPSocket {
 
     int getCurrentSeq();
 
+    boolean disconnect();
+
+    void close();
 
     // GETTERS
 
