@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.HashMap;
 
 public class MRUDPServerSocket {
 
@@ -16,6 +15,8 @@ public class MRUDPServerSocket {
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
     private final int bufferSize;
+    private Thread receivingThread;
+    private volatile boolean started = false;
 
     public MRUDPServerSocket(int port, int bufferSize, ServerModel model) throws Exception{
         this(new JavaUDPSocket(port), bufferSize, model, 12 * 1000);
@@ -31,10 +32,15 @@ public class MRUDPServerSocket {
     }
 
     public void start(){
-        Thread thread = new Thread(new Runnable() {
+        if (started){
+            log("Can't start ServerSocket twice. Forbidden");
+            return;
+        }
+        started = true;
+        receivingThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                while (true) {
+                while (!Thread.interrupted()) {
 
                     try {
                         DatagramPacket packet = datagramPacket;
@@ -83,7 +89,7 @@ public class MRUDPServerSocket {
             }
         });
 
-        thread.start();
+        receivingThread.start();
     }
 
     private void dealWithAck(InetAddress remoteAddress, int remotePort) {
@@ -161,6 +167,13 @@ public class MRUDPServerSocket {
 
     private void log(Throwable t){
         t.printStackTrace();
+    }
+
+    public void close(){
+        if (receivingThread != null){
+            receivingThread.interrupt();
+        }
+        socket.close();
     }
 
 }
