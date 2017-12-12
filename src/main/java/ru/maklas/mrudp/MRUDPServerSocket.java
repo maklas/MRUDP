@@ -8,10 +8,10 @@ import java.util.HashMap;
 
 public class MRUDPServerSocket {
 
-    private int socketIdCounter = 0;
     private final UDPSocket socket;
     private final ServerModel model;
-    private final HashMap<Long, MRUDPSocketImpl> connectionMap = new HashMap<Long, MRUDPSocketImpl>();
+    private final AddressObjectMap<MRUDPSocketImpl> connectionMap = new AddressObjectMap<MRUDPSocketImpl>();
+    private final AddressObjectMap<Object[]> waitingForAckMap = new AddressObjectMap<Object[]>();
     private final DatagramPacket datagramPacket;
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
@@ -47,11 +47,12 @@ public class MRUDPServerSocket {
                         System.arraycopy(packet.getData(), 0, data, 0, dataLength);
 
                         MRUDPSocketImpl subSocket;
-                        synchronized (connectionMap) {
-                            subSocket = connectionMap.get(addressHash(remoteAddress, remotePort));
-                        }
+                        subSocket = connectionMap.get(remoteAddress, remotePort);
 
                         if (subSocket != null){
+                            if (data[0] == MRUDPSocketImpl.connectionResponseAcknowledgment){
+                                dealWithAck(remoteAddress, remotePort);
+                            }
                             subSocket.receiveConnected(remoteAddress, remotePort, data);
                             continue;
                         } else {
@@ -61,6 +62,8 @@ public class MRUDPServerSocket {
                             }
                             if (data[0] == MRUDPSocketImpl.connectionRequest){
                                 dealWithNewConnectionRequest(remoteAddress, remotePort, data);
+                            } else if (data[0] == MRUDPSocketImpl.connectionResponseAcknowledgment) {
+                                dealWithAck(remoteAddress, remotePort);
                             } else {
                                 byte[] userData = new byte[dataLength - 5];
                                 System.arraycopy(data, 5, userData, 0, dataLength - 5);
@@ -83,7 +86,20 @@ public class MRUDPServerSocket {
         thread.start();
     }
 
-    private void dealWithNewConnectionRequest(InetAddress address, int port, byte[] fullData) {
+    private void dealWithAck(InetAddress remoteAddress, int remotePort) {
+        Object[] tuple = waitingForAckMap.remove(remoteAddress, remotePort);
+        if (tuple == null){
+            System.err.println("Socket for ack not found!");
+            return;
+        }
+
+        ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
+        MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+
+        model.registerNewConnection(mrudp, userResp);
+    }
+
+    private void dealWithNewConnectionRequest(final InetAddress address, int port, byte[] fullData) {
         int fullDataLength = fullData.length;
         byte[] userData = new byte[fullDataLength - 9];
         System.arraycopy(fullData, 9, userData, 0, userData.length);
@@ -99,13 +115,20 @@ public class MRUDPServerSocket {
         int socketSeq = MRUDPSocketImpl.extractInt(fullData, 1);
         int expectSeq = MRUDPSocketImpl.extractInt(fullData, 5);
         if (isValid){
+
             sendConnectionResponse(address, port, socketSeq, true, response);
             final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, response, dcTimeDueToInactivity);
-            connectionMap.put(addressHash(address, port), socket);
+
+            waitingForAckMap.put(address, port, new Object[]{connectionResponsePackage, socket});
+            connectionMap.put(address, port, socket);
+
             socket.addListener(new MRUDPListener() {
                 @Override
                 public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
-                    connectionMap.remove(addressHash(fixedBufferMRUDP2.getRemoteAddress(), fixedBufferMRUDP2.getRemotePort()));
+                    InetAddress addr = fixedBufferMRUDP2.getRemoteAddress();
+                    int p = fixedBufferMRUDP2.getRemotePort();
+                    waitingForAckMap.remove(addr, p);
+                    connectionMap.remove(addr, p);
                     model.onSocketDisconnected(socket);
                 }
 
@@ -114,7 +137,7 @@ public class MRUDPServerSocket {
 
                 }
             });
-            model.registerNewConnection(socket, connectionResponsePackage);
+
         } else {
             sendConnectionResponse(address, port, socketSeq, false, response);
         }
@@ -130,17 +153,6 @@ public class MRUDPServerSocket {
         } catch (Throwable e) {
             e.printStackTrace();
         }
-    }
-
-
-    private static long addressHash(InetAddress address, int port){
-        byte[] addressBytes = address.getAddress();
-        long ret =    addressBytes[0] << 24         |
-                (addressBytes[1] & 0xFF) << 16 |
-                (addressBytes[2] & 0xFF) << 8  |
-                (addressBytes[3] & 0xFF);
-        ret += ((long) port) << 32;
-        return ret;
     }
 
     private void log(String msg){

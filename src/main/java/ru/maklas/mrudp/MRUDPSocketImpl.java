@@ -20,7 +20,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     static final byte connectionRequest = 6;
     static final byte connectionResponseAccepted = 7;
     static final byte connectionResponseRejected = 8;
-    static final byte disconnect = 9;
+    static final byte connectionResponseAcknowledgment = 9;
+    static final byte disconnect = 10;
 
 
     private final AtomicReference<SocketState> state = new AtomicReference<SocketState>(SocketState.NOT_CONNECTED);
@@ -103,11 +104,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         connectingToAddress = address;
         connectingToPort = port;
         connectingResponse = null;
-        seq.set(0);
+        this.seq.set(0);
         final int serverSequenceNumber = 0;
         lastInsertedSeq = serverSequenceNumber;
 
-        byte[] fullData = buildConnectionRequest(seq.getAndIncrement(), serverSequenceNumber, data);
+        int seq = this.seq.getAndIncrement();
+        byte[] fullData = buildConnectionRequest(seq, serverSequenceNumber, data);
         connectingRequest = fullData;
         sendData(address, port, fullData);
         final Future<byte[]> futureResponse = e.submit(new Callable<byte[]>() {
@@ -146,6 +148,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         System.arraycopy(fullResponse, 5, userData, 0, userData.length);
         ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, userData);
         if (accepted) {
+            sendData(connectingToAddress, connectingToPort, buildConnectionAck(seq));
             state.set(SocketState.CONNECTED);
         } else {
             state.set(SocketState.NOT_CONNECTED);
@@ -475,6 +478,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 final long startTime = extractLong(fullPackage, 5);
                 final byte[] fullResponse = buildPingResponse(seq, startTime);
                 sendData(address, port, fullResponse);
+
+                final int expectSeq = this.lastInsertedSeq + 1;
+
+                if (expectSeq == seq){
+                    lastInsertedSeq++;
+                    checkForWaitingDatas();
+                } else if (expectSeq > seq){
+                } else {
+                    insertIntoWaitingDatas(seq, new byte[0]);
+                }
+
                 break;
             case pingResponse:
                 final long startingTime = extractLong(fullPackage, 5);
@@ -500,6 +514,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
             case disconnect:
                 receiveQueue.offer(new byte[0]);
+                break;
+            case connectionResponseAcknowledgment:
+                //Ignore I guess
                 break;
             default:
                 log("Unknown settings received: " + settings);
@@ -749,6 +766,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return build5byte(accepted ? connectionResponseAccepted : connectionResponseRejected, seq, data);
     }
 
+    static byte[] buildConnectionAck (int seq){
+        return build5byte(connectionResponseAcknowledgment, seq);
+    }
+
     private static byte[] buildDisconnect (){
         return build5byte(disconnect, 0);
     }
@@ -807,16 +828,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     public static String getSettingsAsString(byte settingsBytes){
         switch (settingsBytes){
-            case reliableRequest            : return "ReliableRequest(" + reliableRequest + ")";
-            case reliableResponse           : return "ReliableResponse(" + reliableResponse + ")";
-            case unreliableRequest          : return "UnreliableRequest(" + unreliableRequest + ")";
-            case pingRequest                : return "PingRequest(" + pingRequest + ")";
-            case pingResponse               : return "PingResponse(" + pingResponse + ")";
-            case connectionRequest          : return "ConnectionRequest(" + connectionRequest + ")";
-            case connectionResponseAccepted : return "ConnectionResponseAccepted(" + connectionResponseAccepted + ")";
-            case connectionResponseRejected : return "ConnectionResponseRejected(" + connectionResponseRejected + ")";
-            case disconnect                 : return "Disconnect(" + disconnect + ")";
-            default                         : return "UNKNOWN TYPE(" + settingsBytes + ")";
+            case reliableRequest                 : return "ReliableRequest(" + reliableRequest + ")";
+            case reliableResponse                : return "ReliableResponse(" + reliableResponse + ")";
+            case unreliableRequest               : return "UnreliableRequest(" + unreliableRequest + ")";
+            case pingRequest                     : return "PingRequest(" + pingRequest + ")";
+            case pingResponse                    : return "PingResponse(" + pingResponse + ")";
+            case connectionRequest               : return "ConnectionRequest(" + connectionRequest + ")";
+            case connectionResponseAccepted      : return "ConnectionResponseAccepted(" + connectionResponseAccepted + ")";
+            case connectionResponseRejected      : return "ConnectionResponseRejected(" + connectionResponseRejected + ")";
+            case connectionResponseAcknowledgment: return "ConnectionResponseAcknowledgment(" + connectionResponseAcknowledgment + ")";
+            case disconnect                      : return "Disconnect(" + disconnect + ")";
+            default                              : return "UNKNOWN TYPE(" + settingsBytes + ")";
         }
     }
 
