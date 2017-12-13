@@ -1,6 +1,8 @@
 package ru.maklas.mrudp;
 
+import java.lang.reflect.Array;
 import java.net.InetAddress;
+import java.util.Collection;
 import java.util.HashMap;
 
 public class AddressObjectMap<T> {
@@ -28,5 +30,9 @@ public class AddressObjectMap<T> {
 
     public T remove(InetAddress address, int port) {
         return map.remove(hash(address, port));
+    }
+
+    public T[] values(T[] type) {
+        return map.values().toArray(type);
     }
 }
