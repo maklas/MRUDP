@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.*;
@@ -57,6 +56,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private long lastPingSendTime;
     private volatile float currentPing = 0;
     private Object userData = null;
+
+    private Thread updateThread;
+    private Thread receivingThread;
 
     public MRUDPSocketImpl(int bufferSize) throws Exception{
         this(new JavaUDPSocket(), bufferSize, 12 * 1000);
@@ -197,7 +199,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         started = true;
 
         if (!createdByServer) {
-            final Thread receivingThread = new Thread(new Runnable() {
+            receivingThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     while (!Thread.interrupted()) {
@@ -240,7 +242,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             receivingThread.start();
         }
 
-        final Thread updateThread = new Thread(new Runnable() {
+        updateThread = new Thread(new Runnable() {
             @Override
             public void run() {
                 while (!Thread.interrupted()) {
@@ -249,14 +251,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         Thread.sleep(updateThreadSleepTimeMS);
                     } catch (InterruptedException interruption) {
                         break;
-                    }
+                    } catch (Exception ignore){}
                 }
             }
         });
         updateThread.start();
     }
 
-    @Override
     public void update() {
         SocketState socketState = state.get();
 
@@ -302,15 +303,28 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public void close() {
+    public boolean disconnect() {
         if (!isConnected()){
             System.err.println("Closing, but not connected!");
-            return;
+            return false;
         }
         sendData(lastConnectedAddress, lastConnectedPort, buildDisconnect());
         state.set(SocketState.NOT_CONNECTED);
         flushBuffers();
         triggerDCListeners();
+        return true;
+    }
+
+    @Override
+    public void close() {
+        disconnect();
+        if (updateThread != null){
+            updateThread.interrupt();
+        }
+        if (receivingThread != null){
+            receivingThread.interrupt();
+        }
+        socket.close();
     }
 
     private void flushBuffers() {
