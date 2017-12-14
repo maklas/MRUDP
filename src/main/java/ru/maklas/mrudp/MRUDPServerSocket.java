@@ -5,6 +5,8 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
+import static ru.maklas.mrudp.MRUDPUtils.*;
+
 public class MRUDPServerSocket {
 
     private final UDPSocket socket;
@@ -56,7 +58,7 @@ public class MRUDPServerSocket {
                         subSocket = connectionMap.get(remoteAddress, remotePort);
 
                         if (subSocket != null){
-                            if (data[0] == MRUDPSocketImpl.connectionResponseAcknowledgment){
+                            if (data[0] == connectionResponseAcknowledgment){
                                 dealWithAck(remoteAddress, remotePort);
                             }
                             subSocket.receiveConnected(remoteAddress, remotePort, data);
@@ -66,9 +68,9 @@ public class MRUDPServerSocket {
                                 log("Got message from unknown address less than 5 bytes long");
                                 continue;
                             }
-                            if (data[0] == MRUDPSocketImpl.connectionRequest){
+                            if (data[0] == connectionRequest){
                                 dealWithNewConnectionRequest(remoteAddress, remotePort, data);
-                            } else if (data[0] == MRUDPSocketImpl.connectionResponseAcknowledgment) {
+                            } else if (data[0] == connectionResponseAcknowledgment) {
                                 dealWithAck(remoteAddress, remotePort);
                             } else {
                                 byte[] userData = new byte[dataLength - 5];
@@ -123,8 +125,8 @@ public class MRUDPServerSocket {
             throw new NullPointerException();
         }
 
-        int socketSeq = MRUDPSocketImpl.extractInt(fullData, 1);
-        int expectSeq = MRUDPSocketImpl.extractInt(fullData, 5);
+        int socketSeq = extractInt(fullData, 1);
+        int expectSeq = extractInt(fullData, 5);
         if (isValid){
 
             sendConnectionResponse(address, port, socketSeq, true, response);
@@ -158,7 +160,7 @@ public class MRUDPServerSocket {
         DatagramPacket sendingPacket = this.sendingPacket;
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
-        sendingPacket.setData(MRUDPSocketImpl.buildConnectionResponse(acceptance, seq, responseData));
+        sendingPacket.setData(buildConnectionResponse(acceptance, seq, responseData));
         try {
             socket.send(sendingPacket);
         } catch (Throwable e) {

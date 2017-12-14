@@ -2,11 +2,9 @@ package ru.maklas.locator;
 
 import java.net.InetAddress;
 
-public class BroadcastProcessor {
+public interface BroadcastProcessor {
 
 
-    byte[] process(InetAddress address, int port, byte[] request){
-        return null;
-    }
+    byte[] process(InetAddress address, int port, byte[] request);
 
 }

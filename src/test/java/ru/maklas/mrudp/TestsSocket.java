@@ -2,9 +2,11 @@ package ru.maklas.mrudp;
 
 import org.junit.Test;
 import org.junit.runners.JUnit4;
+import ru.maklas.locator.*;
 import ru.maklas.mrudp.*;
 
 import java.net.InetAddress;
+import java.util.Arrays;
 
 public class TestsSocket {
 
@@ -106,24 +108,41 @@ public class TestsSocket {
         Thread.sleep(2000);
     }
 
+
     @Test
-    public void putLong() throws Exception {
+    public void locator() throws Exception {
+        final byte[] uuid = "123".getBytes();
+        final int port = 9000;
+        final String address = "255.255.255.255";
 
-        for (int i = 0; i < 5000; i++) {
-            Thread.sleep(1);
-            checkLong();
-        }
+        BroadcastServlet servlet = new BroadcastServlet(port, 512, uuid, new BroadcastProcessor() {
+            @Override
+            public byte[] process(InetAddress address, int port, byte[] request) {
+                System.out.println("requested: " + address.getHostAddress() + ":" + port + " -- " + Arrays.toString(request));
+                if (Arrays.equals(request, new byte[]{1, 2, 3}))
+                    return "Approved".getBytes();
+                else
+                    return "Rejected".getBytes();
+            }
+        });
 
-    }
+        servlet.enable();
 
-    private void checkLong(){
-        byte[] buffer = new byte[8];
 
-        long nano = System.nanoTime();
-        MRUDPSocketImpl.putLong(buffer, nano, 0);
-        long extracted = MRUDPSocketImpl.extractLong(buffer, 0);
-        if (nano != extracted){
-            System.err.println("NOT EQUAL! Expected: " + nano + ", but got " + extracted);
-        }
+
+
+
+
+        final Locator locator = new Locator(uuid, address, port, 512);
+        SimpleProfiler.start();
+        locator.startDiscovery(5000, 5, new byte[]{1, 2, 3}, new Notifier<LocatorResponse>() {
+            @Override
+            public void notify(LocatorResponse locatorResponse) {
+                System.out.println("new response! " + locatorResponse.getAddress().getHostAddress() + ":" + locatorResponse.getPort() + " -- " + new String(locatorResponse.getResponse()));
+            }
+        });
+        System.out.println(SimpleProfiler.getTimeAsString(2));
+
+
     }
 }
