@@ -48,35 +48,72 @@ public class MRUDPServerSocket {
                         DatagramPacket packet = datagramPacket;
                         socket.receive(packet);
 
+                        int dataLength = packet.getLength();
+                        if (dataLength < 5){
+                            continue;
+                        }
+
                         InetAddress remoteAddress = packet.getAddress();
                         int remotePort = packet.getPort();
-                        int dataLength = packet.getLength();
                         byte[] data = new byte[dataLength];
                         System.arraycopy(packet.getData(), 0, data, 0, dataLength);
 
                         MRUDPSocketImpl subSocket;
                         subSocket = connectionMap.get(remoteAddress, remotePort);
 
-                        if (subSocket != null){
-                            if (data[0] == connectionResponseAcknowledgment){
-                                dealWithAck(remoteAddress, remotePort);
-                            }
-                            subSocket.receiveConnected(remoteAddress, remotePort, data);
-                            continue;
-                        } else {
-                            if (dataLength < 5){
-                                log("Got message from unknown address less than 5 bytes long");
-                                continue;
-                            }
-                            if (data[0] == connectionRequest){
-                                dealWithNewConnectionRequest(remoteAddress, remotePort, data);
-                            } else if (data[0] == connectionResponseAcknowledgment) {
-                                dealWithAck(remoteAddress, remotePort);
-                            } else {
-                                byte[] userData = new byte[dataLength - 5];
-                                System.arraycopy(data, 5, userData, 0, dataLength - 5);
-                                model.handleUnknownSourceMsg(userData);
-                            }
+
+                        switch (data[0]) {
+                            case connectionRequest:
+                                if (subSocket != null) {
+                                    subSocket.receiveConnected(remoteAddress, remotePort, data);
+                                } else {
+                                    dealWithNewConnectionRequest(remoteAddress, remotePort, data);
+                                }
+                                break;
+
+                            case connectionAcknowledgment:
+                                if (subSocket != null) {
+                                    subSocket.sendData(remoteAddress, remotePort, buildConnectionAckResponse(0));
+                                } else {
+                                    Object[] tuple = waitingForAckMap.remove(remoteAddress, remotePort);
+                                    if (tuple == null) {
+                                        System.err.println("Socket for ack not found!");
+                                        break;
+                                    }
+
+                                    ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
+                                    MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                    connectionMap.put(remoteAddress, remotePort, mrudp);
+                                    model.registerNewConnection(mrudp, userResp);
+                                    mrudp.sendData(remoteAddress, remotePort, buildConnectionAckResponse(0));
+                                }
+                                break;
+
+                            case disconnect:
+                                if (subSocket != null) {
+                                    connectionMap.remove(remoteAddress, remotePort);
+                                    model.onSocketDisconnected(subSocket);
+                                } else {
+                                    waitingForAckMap.remove(remoteAddress, remotePort);
+                                }
+
+                            default:
+                                if (subSocket != null) {
+                                    subSocket.receiveConnected(remoteAddress, remotePort, data);
+                                } else {
+                                    Object[] tuple = waitingForAckMap.get(remoteAddress, remotePort);
+                                    if (tuple != null) {
+                                        MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                        mrudp.receiveConnected(remoteAddress, remotePort, data);
+                                    } else {
+                                        byte[] userData = new byte[dataLength - 5];
+                                        System.arraycopy(data, 5, userData, 0, dataLength - 5);
+                                        model.handleUnknownSourceMsg(userData);
+                                    }
+                                }
+                                break;
+
+
                         }
 
                     } catch (SocketException se) {
@@ -99,20 +136,14 @@ public class MRUDPServerSocket {
         receivingThread.start();
     }
 
-    private void dealWithAck(InetAddress remoteAddress, int remotePort) {
-        Object[] tuple = waitingForAckMap.remove(remoteAddress, remotePort);
-        if (tuple == null){
-            System.err.println("Socket for ack not found!");
+    private void dealWithNewConnectionRequest(final InetAddress address, int port, byte[] fullData) {
+        Object[] tuple = waitingForAckMap.get(address, port);
+        if (tuple != null) {
+            MRUDPSocketImpl sock = (MRUDPSocketImpl) tuple[1];
+            sock.receiveConnected(address, port, fullData);
             return;
         }
 
-        ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
-        MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
-
-        model.registerNewConnection(mrudp, userResp);
-    }
-
-    private void dealWithNewConnectionRequest(final InetAddress address, int port, byte[] fullData) {
         int fullDataLength = fullData.length;
         byte[] userData = new byte[fullDataLength - 9];
         System.arraycopy(fullData, 9, userData, 0, userData.length);
@@ -128,32 +159,11 @@ public class MRUDPServerSocket {
         int socketSeq = extractInt(fullData, 1);
         int expectSeq = extractInt(fullData, 5);
         if (isValid){
-
-            sendConnectionResponse(address, port, socketSeq, true, response);
             final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, response, dcTimeDueToInactivity);
-
             waitingForAckMap.put(address, port, new Object[]{connectionResponsePackage, socket});
-            connectionMap.put(address, port, socket);
-
-            socket.addListener(new MRUDPListener() {
-                @Override
-                public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
-                    InetAddress addr = fixedBufferMRUDP2.getRemoteAddress();
-                    int p = fixedBufferMRUDP2.getRemotePort();
-                    waitingForAckMap.remove(addr, p);
-                    connectionMap.remove(addr, p);
-                    model.onSocketDisconnected(socket);
-                }
-
-                @Override
-                public void onPingUpdated(float newPing) {
-
-                }
-            });
-
-        } else {
-            sendConnectionResponse(address, port, socketSeq, false, response);
         }
+
+        sendConnectionResponse(address, port, socketSeq, isValid, response);
     }
 
     private void sendConnectionResponse(InetAddress address, int port, int seq, boolean acceptance, byte[] responseData){

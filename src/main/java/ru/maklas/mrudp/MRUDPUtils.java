@@ -10,9 +10,9 @@ class MRUDPUtils {
     static final byte connectionRequest = 6;
     static final byte connectionResponseAccepted = 7;
     static final byte connectionResponseRejected = 8;
-    static final byte connectionResponseAcknowledgment = 9;
-    static final byte disconnect = 10;
-
+    static final byte connectionAcknowledgment = 9;
+    static final byte connectionAcknowledgmentResponse = 10;
+    static final byte disconnect = 11;
 
 
     static byte[] buildReliableRequest (int seq, byte [] data){
@@ -53,7 +53,11 @@ class MRUDPUtils {
     }
 
     static byte[] buildConnectionAck (int seq){
-        return build5byte(connectionResponseAcknowledgment, seq);
+        return build5byte(connectionAcknowledgment, seq);
+    }
+
+    static byte[] buildConnectionAckResponse(int seq){
+        return build5byte(connectionAcknowledgmentResponse, seq);
     }
 
     static byte[] buildDisconnect (){
@@ -125,7 +129,7 @@ class MRUDPUtils {
             case connectionRequest               : return "ConnectionRequest(" + connectionRequest + ")";
             case connectionResponseAccepted      : return "ConnectionResponseAccepted(" + connectionResponseAccepted + ")";
             case connectionResponseRejected      : return "ConnectionResponseRejected(" + connectionResponseRejected + ")";
-            case connectionResponseAcknowledgment: return "ConnectionResponseAcknowledgment(" + connectionResponseAcknowledgment + ")";
+            case connectionAcknowledgment: return "ConnectionResponseAcknowledgment(" + connectionAcknowledgment + ")";
             case disconnect                      : return "Disconnect(" + disconnect + ")";
             default                              : return "UNKNOWN TYPE(" + settingsBytes + ")";
         }

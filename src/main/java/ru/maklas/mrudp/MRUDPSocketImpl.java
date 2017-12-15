@@ -38,6 +38,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private boolean createdByServer = false;
     private byte[] responseForConnect = new byte[]{0};
+    private volatile boolean ackDelivered = false;
 
     private final int dcTimeDueToInactivity;
     private volatile long lastCommunicationTime;
@@ -81,10 +82,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public ConnectionResponse connect(int timeout, InetAddress address, int port, byte[] data) {
-        //Если не подключен в данный момент,
-        // устанавливает connectingToAddress и connectingToPort, а connectingResponse = null;
-        // Ждет пока connectingResponse не станет значением. Как только станет - возвращает. Или как врем ожидания кончится.
-        // Если в ответе будет ACCEPTED, сокет будет уже подключен.
         if (address == null || port < 0) {
             throw new NullPointerException();
         }
@@ -93,6 +90,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         if (stateAtTheBeginning != SocketState.NOT_CONNECTED){
             return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, new byte[0]);
         }
+
+
+
         state.set(SocketState.CONNECTING);
         ExecutorService e = Executors.newSingleThreadExecutor();
         connectingToAddress = address;
@@ -133,7 +133,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         if (fullResponse == null){
             state.set(SocketState.NOT_CONNECTED);
-            connectingToAddress = null;
             return new ConnectionResponse(ConnectionResponse.Type.NO_RESPONSE, new byte[0]);
         }
 
@@ -142,21 +141,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         System.arraycopy(fullResponse, 5, userData, 0, userData.length);
         ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, userData);
         if (accepted) {
+            ackDelivered = false;
             sendData(connectingToAddress, connectingToPort, buildConnectionAck(seq));
             state.set(SocketState.CONNECTED);
+            long currentTime = System.currentTimeMillis();
+            this.lastCommunicationTime = currentTime;
+            this.lastPingSendTime = currentTime;
+            this.lastConnectedAddress = address;
+            this.lastConnectedPort = port;
         } else {
             state.set(SocketState.NOT_CONNECTED);
-            //FOR TEST ONLY
-            if (fullResponse[0] != connectionResponseRejected){
-                System.err.println("Got wrong package for connection response");
-            }
         }
-        long currentTime = System.currentTimeMillis();
-        this.lastCommunicationTime = currentTime;
-        this.lastPingSendTime = currentTime;
-        this.lastConnectedAddress = address;
-        this.lastConnectedPort = port;
-        this.connectingToAddress = null;
         return connectionResponse;
     }
 
@@ -262,10 +257,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 }
                 break;
             case CONNECTED:
+                if (!ackDelivered){
+                    sendData(lastConnectedAddress, lastConnectedPort, buildConnectionAck(0));
+                    break;
+                }
                 final long currTime = System.currentTimeMillis();
                 if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
                     receiveQueue.offer(new byte[0]);
-                    return;
+                    break;
                 }
 
                 if (currTime - lastPingSendTime > pingCD){
@@ -512,6 +511,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     sendData(address, port, response);
                 }
                 break;
+            case connectionAcknowledgmentResponse:
+                ackDelivered = true;
+                break;
             case connectionResponseAccepted:
                 //ignore I guess
                 break;
@@ -521,7 +523,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             case disconnect:
                 receiveQueue.offer(new byte[0]);
                 break;
-            case connectionResponseAcknowledgment:
+            case connectionAcknowledgment:
                 //Ignore I guess
                 break;
             default:
