@@ -94,6 +94,7 @@ public class MRUDPServerSocket {
                                     connectionMap.remove(remoteAddress, remotePort);
                                     subSocket.receiveConnected(remoteAddress, remotePort, data);
                                     model.onSocketDisconnected(subSocket);
+                                    subSocket.closeByServer();
                                 } else {
                                     waitingForAckMap.remove(remoteAddress, remotePort);
                                 }
