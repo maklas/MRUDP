@@ -92,6 +92,7 @@ public class MRUDPServerSocket {
                             case disconnect:
                                 if (subSocket != null) {
                                     connectionMap.remove(remoteAddress, remotePort);
+                                    subSocket.receiveConnected(remoteAddress, remotePort, data);
                                     model.onSocketDisconnected(subSocket);
                                 } else {
                                     waitingForAckMap.remove(remoteAddress, remotePort);
@@ -118,11 +119,6 @@ public class MRUDPServerSocket {
 
                     } catch (SocketException se) {
                         log("Got SocketException in receiving thread. Quitting...");
-                        MRUDPSocketImpl[] values = connectionMap.values(new MRUDPSocketImpl[0]);
-                        for (MRUDPSocketImpl value : values) {
-                            value.close();
-                        }
-
                         break;
                     } catch (IOException e) {
                         log("IOE in receiving thread");

@@ -428,7 +428,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             try {
                 socket.send(sendingPacket);
             } catch (Exception e){
-                log("IOException while trying to send via DatagramSocket");
+                log("IOException while trying to send via DatagramSocket" + e.getMessage());
             }
         }
     }
