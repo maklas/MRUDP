@@ -35,4 +35,8 @@ public class AddressObjectMap<T> {
     public T[] values(T[] type) {
         return map.values().toArray(type);
     }
+
+    public void clear() {
+        map.clear();
+    }
 }

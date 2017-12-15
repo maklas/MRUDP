@@ -137,6 +137,7 @@ public class Locator {
             this.seq = seq;
             this.responseNotifier = responseNotifier;
             this.stop = false;
+            addressObjectMap.clear();
         }
 
         @Override
