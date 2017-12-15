@@ -126,6 +126,11 @@ public class MRUDPServerSocket {
                         log(ex);
                     }
                 }
+
+                MRUDPSocketImpl[] values = connectionMap.values(new MRUDPSocketImpl[0]);
+                for (MRUDPSocketImpl value : values) {
+                    value.closeByServer();
+                }
             }
         });
 

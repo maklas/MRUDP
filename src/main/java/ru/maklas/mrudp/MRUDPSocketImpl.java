@@ -237,7 +237,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         Thread.sleep(updateThreadSleepTimeMS);
                     } catch (InterruptedException interruption) {
                         break;
-                    } catch (Exception ignore){}
+                    }
                 }
             }
         });
@@ -247,39 +247,41 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     public void update() {
         SocketState socketState = state.get();
 
-        switch (socketState){
-            case CONNECTING:
-                InetAddress connectAddress = connectingToAddress;
-                int connectPort = connectingToPort;
-                byte[] fullConnectData = connectingRequest;
-                if (connectAddress != null && fullConnectData != null){
-                    sendData(connectAddress, connectPort, fullConnectData);
-                }
-                break;
-            case CONNECTED:
-                if (!ackDelivered){
-                    sendData(lastConnectedAddress, lastConnectedPort, buildConnectionAck(0));
-                    break;
-                }
-                final long currTime = System.currentTimeMillis();
-                if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
-                    receiveQueue.offer(new byte[0]);
-                    break;
-                }
-
-                if (currTime - lastPingSendTime > pingCD){
-                    sendPing();
-                    lastPingSendTime = currTime;
-                }
-                synchronized (requestList) {
-                    Iterator<Object[]> savedRequests = requestList.iterator();
-                    while (savedRequests.hasNext()) {
-                        byte[] fullDataReq = (byte[]) savedRequests.next()[1];
-                        sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
+        try {
+            switch (socketState){
+                case CONNECTING:
+                    InetAddress connectAddress = connectingToAddress;
+                    int connectPort = connectingToPort;
+                    byte[] fullConnectData = connectingRequest;
+                    if (connectAddress != null && fullConnectData != null){
+                        sendData(connectAddress, connectPort, fullConnectData);
                     }
-                }
-                break;
-        }
+                    break;
+                case CONNECTED:
+                    if (!ackDelivered){
+                        sendData(lastConnectedAddress, lastConnectedPort, buildConnectionAck(0));
+                        break;
+                    }
+                    final long currTime = System.currentTimeMillis();
+                    if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
+                        receiveQueue.offer(new byte[0]);
+                        break;
+                    }
+
+                    if (currTime - lastPingSendTime > pingCD){
+                        sendPing();
+                        lastPingSendTime = currTime;
+                    }
+                    synchronized (requestList) {
+                        Iterator<Object[]> savedRequests = requestList.iterator();
+                        while (savedRequests.hasNext()) {
+                            byte[] fullDataReq = (byte[]) savedRequests.next()[1];
+                            sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
+                        }
+                    }
+                    break;
+            }
+        } catch (Exception ignore) {}
 
 
     }
@@ -303,6 +305,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         flushBuffers();
         triggerDCListeners();
         return true;
+    }
+
+    void closeByServer(){
+        state.set(SocketState.NOT_CONNECTED);
+        if (updateThread != null){
+            updateThread.interrupt();
+        }
     }
 
     @Override
