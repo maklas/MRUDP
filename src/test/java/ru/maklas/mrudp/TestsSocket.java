@@ -174,18 +174,6 @@ public class TestsSocket {
                         socket.send(sendingBytes);
                     }
                 })).start();
-
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }).start();
             }
 
             @Override
@@ -195,7 +183,7 @@ public class TestsSocket {
 
             @Override
             public void onSocketDisconnected(MRUDPSocketImpl socket) {
-
+                System.out.println("Server dc");
             }
         }, 7000);
 
@@ -203,6 +191,18 @@ public class TestsSocket {
 
         MRUDPSocketImpl client = new MRUDPSocketImpl(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 7000);
         client.start(75);
+
+        client.addListener(new MRUDPListener() {
+            @Override
+            public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
+                System.out.println("client dc");
+            }
+
+            @Override
+            public void onPingUpdated(float newPing) {
+
+            }
+        });
 
         ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{1, 2, 3});
         System.out.println(connect);
@@ -216,14 +216,15 @@ public class TestsSocket {
 
 
         Thread.sleep(500);
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 10000; i++) {
             byte[] in = new byte[4];
             MRUDPUtils.putInt(in, i, 0);
             client.send(in);
+            Thread.sleep(10);
         }
 
 
-        Thread.sleep(5000);
+        Thread.sleep(20000);
 
 
     }

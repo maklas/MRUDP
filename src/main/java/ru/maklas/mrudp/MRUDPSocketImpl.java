@@ -497,7 +497,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 final int expectSeq = this.lastInsertedSeq + 1;
 
                 if (expectSeq == seq){
-                    lastInsertedSeq++;
+                    lastInsertedSeq = seq;
                     checkForWaitingDatas();
                 } else if (expectSeq > seq){
                 } else {
@@ -614,16 +614,22 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 madeIt = false;
                 expectedSeq = lastInsertedSeq + 1;
 
-                for (Object[] pair : waitings) {
+
+                Iterator<Object[]> waitingIter = waitings.iterator();
+                while (waitingIter.hasNext()) {
+                    Object[] pair = waitingIter.next();
                     if (((Integer) pair[0]) == expectedSeq) {
                         byte[] bytes = (byte[]) pair[1];
-                        if (bytes.length == 0){ // Если в очереди остался пинг, то мы ничего не делаем, а просто пропускаем seq
-                            lastInsertedSeq++;
-                            continue;
+                        if (bytes.length == 0) { // Если в очереди остался пинг, то мы ничего не делаем, а просто пропускаем se TODO
+                            this.lastInsertedSeq = expectedSeq;
+                            madeIt = true;
+                            waitingIter.remove();
+                            break;
                         } else {
                             insert(expectedSeq, bytes);
                             madeIt = true;
-                            continue;
+                            waitingIter.remove();
+                            break;
                         }
                     }
                 }
@@ -649,11 +655,11 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void insertIntoWaitingDatas(int seq, byte[] fullPackage) {
         synchronized (waitings) {
             for (Object[] pair : waitings) {
-                if (((Integer) pair[0]) == seq) {
+                if (pair[0].equals(seq)) {
                     return;
                 }
             }
-            waitings.add(new Object[]{Integer.valueOf(seq), fullPackage});
+            waitings.add(new Object[]{seq, fullPackage});
         }
     }
 
