@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import java.util.Arrays;
+
 public class ConnectionResponse {
 
     public enum Type {ALREADY_CONNECTED_OR_CONNECTING, NO_RESPONSE, ACCEPTED, NOT_ACCEPTED}
@@ -18,5 +20,13 @@ public class ConnectionResponse {
 
     public byte[] getResponseData() {
         return responseData;
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectionResponse{" +
+                "result=" + type +
+                ", responseData=" + Arrays.toString(responseData) +
+                '}';
     }
 }

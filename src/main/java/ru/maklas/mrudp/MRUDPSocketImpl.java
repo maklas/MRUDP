@@ -78,6 +78,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.seq.set(socketSeq);
         this.state.set(SocketState.CONNECTED);
         this.lastCommunicationTime = System.currentTimeMillis();
+        this.ackDelivered = true;
     }
 
     @Override

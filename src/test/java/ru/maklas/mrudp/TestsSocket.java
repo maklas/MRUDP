@@ -145,4 +145,117 @@ public class TestsSocket {
 
 
     }
+
+
+
+    @Test
+    public void packetLoss() throws Exception{
+
+        InetAddress localHost = InetAddress.getLocalHost();
+        int port = 9000;
+        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new JavaUDPSocket(port), 50), 512, new ServerModel() {
+            @Override
+            public ConnectionResponsePackage<byte[]> validateNewConnection(InetAddress address, int port, byte[] userData) {
+                return ConnectionResponsePackage.accept(new byte[0]);
+            }
+
+            @Override
+            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage) {
+                System.out.println("Server registered.");
+                socket.start(75);
+                new Thread(new Tester("ServerC", socket, new SocketProcessor() {
+                    @Override
+                    public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
+                        int received = MRUDPUtils.extractInt(data, 0);
+                        int toSend = received + 1048576;
+                        System.out.println("Server received " + MRUDPUtils.extractInt(data, 0) + " and responding with " + toSend);
+                        byte[] sendingBytes = new byte[4];
+                        MRUDPUtils.putInt(sendingBytes, toSend, 0);
+                        socket.send(sendingBytes);
+                    }
+                })).start();
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }).start();
+            }
+
+            @Override
+            public void handleUnknownSourceMsg(byte[] userData) {
+
+            }
+
+            @Override
+            public void onSocketDisconnected(MRUDPSocketImpl socket) {
+
+            }
+        }, 7000);
+
+        server.start();
+
+        MRUDPSocketImpl client = new MRUDPSocketImpl(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 7000);
+        client.start(75);
+
+        ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{1, 2, 3});
+        System.out.println(connect);
+
+        new Thread(new Tester("Client", client, new SocketProcessor() {
+            @Override
+            public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
+                System.out.println("Client received: " + (MRUDPUtils.extractInt(data, 0) - 1048576));
+            }
+        })).start();
+
+
+        Thread.sleep(500);
+        for (int i = 0; i < 1000; i++) {
+            byte[] in = new byte[4];
+            MRUDPUtils.putInt(in, i, 0);
+            client.send(in);
+        }
+
+
+        Thread.sleep(5000);
+
+
+    }
+
+
+
+    private class Tester implements Runnable {
+
+        private final String tag;
+        final MRUDPSocket socket;
+        private final SocketProcessor processor;
+
+        public Tester(String tag, MRUDPSocket socket, SocketProcessor processor) {
+            this.tag = tag;
+            this.socket = socket;
+            this.processor = processor;
+        }
+
+        @Override
+        public void run() {
+
+
+            while (true){
+                try {
+                    Thread.sleep(50);
+
+                    socket.receive(processor);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }
+
+    }
 }
