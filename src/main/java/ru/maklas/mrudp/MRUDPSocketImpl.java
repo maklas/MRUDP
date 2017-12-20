@@ -328,6 +328,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void flushBuffers() {
+        waitings.clear();
         requestList.clear();
         receiveQueue.clear();
     }
@@ -607,33 +608,19 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private void checkForWaitingDatas() {
         int expectedSeq;
-        boolean madeIt = true;
 
         synchronized (waitings) {
-            while (madeIt) {
-                madeIt = false;
-                expectedSeq = lastInsertedSeq + 1;
+            expectedSeq = lastInsertedSeq + 1;
+            byte[] mayBeFullData = waitings.remove(expectedSeq);
 
-
-                Iterator<Object[]> waitingIter = waitings.iterator();
-                while (waitingIter.hasNext()) {
-                    Object[] pair = waitingIter.next();
-                    if (((Integer) pair[0]) == expectedSeq) {
-                        byte[] bytes = (byte[]) pair[1];
-                        if (bytes.length == 0) { // Если в очереди остался пинг, то мы ничего не делаем, а просто пропускаем se TODO
-                            this.lastInsertedSeq = expectedSeq;
-                            madeIt = true;
-                            waitingIter.remove();
-                            break;
-                        } else {
-                            insert(expectedSeq, bytes);
-                            madeIt = true;
-                            waitingIter.remove();
-                            break;
-                        }
-                    }
+            while (mayBeFullData != null) {
+                if (mayBeFullData.length == 0) { // Если в очереди остался пинг
+                    this.lastInsertedSeq = expectedSeq;
+                } else {
+                    insert(expectedSeq, mayBeFullData);
                 }
-
+                expectedSeq = lastInsertedSeq + 1;
+                mayBeFullData = waitings.remove(expectedSeq);
             }
         }
 
@@ -651,19 +638,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         receiveQueue.offer(userData);
     }
 
-    private final ArrayList<Object[]> waitings = new ArrayList<Object[]>(); //<Integer.class, byte[].class>
+    private final SortedIntList<byte[]> waitings = new SortedIntList<byte[]>();
     private void insertIntoWaitingDatas(int seq, byte[] fullPackage) {
         synchronized (waitings) {
-            for (Object[] pair : waitings) {
-                if (pair[0].equals(seq)) {
-                    return;
-                }
-            }
-            waitings.add(new Object[]{seq, fullPackage});
+            waitings.insert(seq, fullPackage);
         }
     }
 
-    private final ArrayList<Object[]> requestList = new ArrayList<Object[]>();
+    private final Array<Object[]> requestList = new Array<Object[]>();
     private void saveRequest(int seq, byte[] fullPackage) {
         synchronized (requestList) {
             requestList.add(new Object[]{seq, fullPackage});
