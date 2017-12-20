@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,6 +25,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final UDPSocket socket;
     private final DatagramPacket receivingPacket;
     private final DatagramPacket sendingPacket;
+    private final DatagramPacket responsePacket;
     private final Object sendingMonitor = new Object();
 
     private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
@@ -60,6 +60,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         socket = dSocket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        this.responsePacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.dcTimeDueToInactivity = dcTimeDueToInactivity;
         createdByServer = false;
         lastCommunicationTime = System.currentTimeMillis();
@@ -69,6 +70,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.socket = socket;
         this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
+        this.responsePacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responseForConnect = responseForConnect;
         this.dcTimeDueToInactivity = dcTimeDueToInactivity;
         this.createdByServer = true;
@@ -433,15 +435,27 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     void sendData(InetAddress address, int port, byte[] fullPackage){
         synchronized (sendingMonitor) {
+            DatagramPacket sendingPacket = this.sendingPacket;
             sendingPacket.setAddress(address);
             sendingPacket.setPort(port);
             sendingPacket.setData(fullPackage);
             try {
                 socket.send(sendingPacket);
-            } catch (Exception e){
+            } catch (Exception e) {
                 log("IOException while trying to send via DatagramSocket" + e.getMessage());
             }
         }
+    }
+
+    void sendResponseData(InetAddress returnAddress, int port, byte[] fullPackage){
+            responsePacket.setAddress(returnAddress);
+            responsePacket.setPort(port);
+            responsePacket.setData(fullPackage);
+            try {
+                socket.send(sendingPacket);
+            } catch (Exception e){
+                log("IOException while trying to send via DatagramSocket" + e.getMessage());
+            }
     }
 
     void receiveConnected(InetAddress address, int port, byte[] fullPackage){
@@ -461,7 +475,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         switch (settings){
             case reliableRequest:
                 byte[] resp = buildReliableResponse(seq);
-                sendData(address, port, resp);
+                sendResponseData(address, port, resp);
                 final int expectedSeq = this.lastInsertedSeq + 1;
 
                 if (expectedSeq == seq){
@@ -493,7 +507,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             case pingRequest:
                 final long startTime = extractLong(fullPackage, 5);
                 final byte[] fullResponse = buildPingResponse(seq, startTime);
-                sendData(address, port, fullResponse);
+                sendResponseData(address, port, fullResponse);
 
                 final int expectSeq = this.lastInsertedSeq + 1;
 
@@ -519,7 +533,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             case connectionRequest:
                 if (createdByServer){
                     byte[] response = buildConnectionResponse(true, seq, responseForConnect);
-                    sendData(address, port, response);
+                    sendResponseData(address, port, response);
                 }
                 break;
             case connectionAcknowledgmentResponse:
