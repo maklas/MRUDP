@@ -68,20 +68,18 @@ public class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
     }
 
     public E remove (int index) {
-        E match = null;
         if (first != null) {
             Node<E> c = first;
             if (c.index == index){
                 first = first.n;
                 nodePool.free(c);
+                size--;
                 return c.value;
             }
             while (c.n != null && c.index < index) {
                 c = c.n;
             }
             if (c.index == index) {
-                match = c.value;
-
                 if (c.p != null){
                     c.p.n = c.n;
                 }
@@ -89,9 +87,11 @@ public class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
                     c.n.p = c.p;
                 }
                 nodePool.free(c);
+                size--;
+                return c.value;
             }
         }
-        return match;
+        return null;
     }
 
 

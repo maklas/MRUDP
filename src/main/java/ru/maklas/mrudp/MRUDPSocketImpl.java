@@ -274,9 +274,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         lastPingSendTime = currTime;
                     }
                     synchronized (requestList) {
-                        Iterator<Object[]> savedRequests = requestList.iterator();
+                        Iterator<SortedIntList.Node<byte[]>> savedRequests = requestList.iterator();
                         while (savedRequests.hasNext()) {
-                            byte[] fullDataReq = (byte[]) savedRequests.next()[1];
+                            byte[] fullDataReq = savedRequests.next().value;
                             sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
                         }
                     }
@@ -645,25 +645,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    private final Array<Object[]> requestList = new Array<Object[]>();
+    private final SortedIntList<byte[]> requestList = new SortedIntList<byte[]>();
     private void saveRequest(int seq, byte[] fullPackage) {
         synchronized (requestList) {
-            requestList.add(new Object[]{seq, fullPackage});
+            requestList.insert(seq, fullPackage);
         }
     }
 
     private boolean removeRequest(int seq) {
         synchronized (requestList) {
-            Iterator<Object[]> iterator = requestList.iterator();
-            while (iterator.hasNext()) {
-                Object[] next = iterator.next();
-                if ((Integer) next[0] == seq) {
-                    iterator.remove();
-                    return true;
-                }
-            }
+            return requestList.remove(seq) != null;
         }
-        return false;
     }
 
 
