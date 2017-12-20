@@ -26,7 +26,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final DatagramPacket receivingPacket;
     private final DatagramPacket sendingPacket;
     private final DatagramPacket responsePacket;
-    private final Object sendingMonitor = new Object();
+    private final Object requestSendingMonitor = new Object();
+    private final Object responseSendingMonitor = new Object();
 
     private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
     private int lastInsertedSeq = 0;
@@ -434,7 +435,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void sendData(InetAddress address, int port, byte[] fullPackage){
-        synchronized (sendingMonitor) {
+        synchronized (requestSendingMonitor) {
             DatagramPacket sendingPacket = this.sendingPacket;
             sendingPacket.setAddress(address);
             sendingPacket.setPort(port);
@@ -448,14 +449,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void sendResponseData(InetAddress returnAddress, int port, byte[] fullPackage){
+        synchronized (responseSendingMonitor) {
+            DatagramPacket responsePacket = this.responsePacket;
             responsePacket.setAddress(returnAddress);
             responsePacket.setPort(port);
             responsePacket.setData(fullPackage);
             try {
-                socket.send(sendingPacket);
-            } catch (Exception e){
+                socket.send(responsePacket);
+            } catch (Exception e) {
                 log("IOException while trying to send via DatagramSocket" + e.getMessage());
             }
+        }
     }
 
     void receiveConnected(InetAddress address, int port, byte[] fullPackage){
