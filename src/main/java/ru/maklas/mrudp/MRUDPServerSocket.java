@@ -128,7 +128,7 @@ public class MRUDPServerSocket {
                     }
                 }
 
-                MRUDPSocketImpl[] values = connectionMap.values(new MRUDPSocketImpl[0]);
+                Iterable<MRUDPSocketImpl> values = connectionMap.values(new MRUDPSocketImpl[0]);
                 for (MRUDPSocketImpl value : values) {
                     value.closeByServer();
                 }
