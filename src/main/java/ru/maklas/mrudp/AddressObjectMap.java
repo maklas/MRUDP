@@ -1,13 +1,13 @@
 package ru.maklas.mrudp;
 
-import java.lang.reflect.Array;
+import ru.maklas.utils.LongMap;
+
 import java.net.InetAddress;
-import java.util.Collection;
 import java.util.HashMap;
 
 public class AddressObjectMap<T> {
 
-    private final HashMap<Long, T> map = new HashMap<Long, T>();
+    private final LongMap<T> map = new LongMap<T>();
 
     public void put(InetAddress address, int port, T o){
         long hash = hash(address, port);
@@ -32,8 +32,12 @@ public class AddressObjectMap<T> {
         return map.remove(hash(address, port));
     }
 
-    public T[] values(T[] type) {
-        return map.values().toArray(type);
+    public Iterable<T> values(T[] type) {
+        return map.values();
+    }
+    
+    public void putNew(InetAddress address, int port, T val){
+
     }
 
     public void clear() {
