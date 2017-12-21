@@ -205,8 +205,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                             InetAddress remoteAddress = packet.getAddress();
                             int remotePort = packet.getPort();
                             int dataLength = packet.getLength();
-                            byte[] fullData = new byte[dataLength];
-                            System.arraycopy(packet.getData(), 0, fullData, 0, dataLength);
+                            //byte[] fullData = new byte[dataLength];
+                            //System.arraycopy(packet.getData(), 0, fullData, 0, dataLength);
 
                             SocketState socketState = state.get();
 
@@ -214,10 +214,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                                 case NOT_CONNECTED:
                                     break;
                                 case CONNECTING:
-                                    receiveWhileConnecting(remoteAddress, remotePort, fullData);
+                                    receiveWhileConnecting(remoteAddress, remotePort, receivingBuffer, dataLength);
                                     break;
                                 case CONNECTED:
-                                    receiveConnected(remoteAddress, remotePort, fullData);
+                                    receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
                                     break;
                             }
 
@@ -466,9 +466,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    void receiveConnected(InetAddress address, int port, byte[] fullPackage){
+    void receiveConnected(InetAddress address, int port, byte[] fullPackage, int packageLength){
         this.lastCommunicationTime = System.currentTimeMillis();
-        if (fullPackage.length < 5){
+        if (packageLength < 5){
             log("Received message less than 5 bytes long!");
             return;
         }
@@ -487,28 +487,27 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 final int expectedSeq = this.lastInsertedSeq + 1;
 
                 if (expectedSeq == seq){
-                    insert(expectedSeq, fullPackage, 5);
+                    insert(expectedSeq, fullPackage, 5, packageLength - 5);
                     checkForWaitingDatas();
                 } else if (expectedSeq > seq){
                 } else {
-                    byte[] userData = new byte[fullPackage.length - 5];
+                    byte[] userData = new byte[packageLength - 5];
                     System.arraycopy(fullPackage, 5, userData, 0, userData.length);
                     insertIntoWaitingDatas(seq, userData);
                 }
                 break;
             case reliableResponse:
-                int responseLength = fullPackage.length;
-                if (responseLength != 5){
-                    log("Unexpected response length: " + responseLength);
+                if (packageLength != 5){
+                    log("Unexpected response length: " + packageLength);
                 }
                 removeRequest(seq);
                 break;
             case unreliableRequest:
-                byte[] data = new byte[fullPackage.length - 5];
-                System.arraycopy(fullPackage, 5,  data, 0, data.length);
-                if (data.length == 5){
-                    log("Received unreliable request of 0 length!");
-                    break;
+                int userDataLength = packageLength - 5;
+                byte[] data = new byte[userDataLength];
+                System.arraycopy(fullPackage, 5,  data, 0, userDataLength);
+                if (userDataLength == 5){
+                    log("Received unreliable request of 0 length! That will lead to dc");
                 }
                 receiveQueue.offer(data);
                 break;
@@ -566,9 +565,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
 
-    void receiveWhileConnecting(InetAddress address, int port, byte[] fullPackage){
+    void receiveWhileConnecting(InetAddress address, int port, byte[] fullPackage, int packageLength){
         this.lastCommunicationTime = System.currentTimeMillis();
-        if (fullPackage.length < 5){
+        if (packageLength < 5){
             log("Received message less than 5 bytes long!");
             return;
         }
@@ -586,7 +585,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 byte[] resp = buildReliableResponse(seq);
                 sendData(address, port, resp);
 
-                byte[] userData = new byte[fullPackage.length - 5];
+                byte[] userData = new byte[packageLength - 5];
                 System.arraycopy(fullPackage, 5, userData, 0, userData.length);
                 insertIntoWaitingDatas(seq, userData);
                 break;
@@ -597,7 +596,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
             case connectionResponseAccepted:
             case connectionResponseRejected:
-                this.connectingResponse = fullPackage;
+                byte[] userPackageWithSettings = new byte[packageLength];
+                System.arraycopy(fullPackage, 0, userPackageWithSettings, 0, packageLength);
+                this.connectingResponse = userPackageWithSettings;
                 break;
 
             case disconnect:
@@ -648,10 +649,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     }
 
-    private void insert(int seq, byte[] fullData, int offset){
+    private void insert(int seq, byte[] fullData, int offset, int length){
         this.lastInsertedSeq = seq;
-        byte[] userData = new byte[fullData.length - offset];
-        System.arraycopy(fullData, offset, userData, 0, userData.length);
+        byte[] userData = new byte[length];
+        System.arraycopy(fullData, offset, userData, 0, length);
         receiveQueue.offer(userData);
     }
 
