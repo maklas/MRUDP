@@ -23,10 +23,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private volatile byte[] connectingRequest = null;
     private final AtomicInteger seq = new AtomicInteger(0);
     private final UDPSocket socket;
-    private final DatagramPacket receivingPacket;
     private final DatagramPacket sendingPacket;
     private final DatagramPacket responsePacket;
     private final Object sendingMonitor = new Object();
+    private final int bufferSize;
 
     private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
     private int lastInsertedSeq = 0;
@@ -39,6 +39,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private boolean createdByServer = false;
     private byte[] responseForConnect = new byte[]{0};
     private volatile boolean ackDelivered = false;
+    private static final byte[] zeroLengthByte = new byte[0];
 
     private final int dcTimeDueToInactivity;
     private volatile long lastCommunicationTime;
@@ -58,17 +59,16 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
         socket = dSocket;
-        this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responsePacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.dcTimeDueToInactivity = dcTimeDueToInactivity;
         createdByServer = false;
         lastCommunicationTime = System.currentTimeMillis();
+        this.bufferSize = bufferSize;
     }
 
     MRUDPSocketImpl(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect, int dcTimeDueToInactivity) {
         this.socket = socket;
-        this.receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responsePacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responseForConnect = responseForConnect;
@@ -81,6 +81,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.state.set(SocketState.CONNECTED);
         this.lastCommunicationTime = System.currentTimeMillis();
         this.ackDelivered = true;
+        this.bufferSize = bufferSize;
     }
 
     @Override
@@ -91,7 +92,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         SocketState stateAtTheBeginning = state.get();
         if (stateAtTheBeginning != SocketState.NOT_CONNECTED){
-            return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, new byte[0]);
+            return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, zeroLengthByte);
         }
 
 
@@ -136,7 +137,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         if (fullResponse == null){
             state.set(SocketState.NOT_CONNECTED);
-            return new ConnectionResponse(ConnectionResponse.Type.NO_RESPONSE, new byte[0]);
+            return new ConnectionResponse(ConnectionResponse.Type.NO_RESPONSE, zeroLengthByte);
         }
 
         boolean accepted = fullResponse[0] == connectionResponseAccepted;
@@ -191,10 +192,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             receivingThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
+
+                    byte[] receivingBuffer = new byte[bufferSize];
+                    DatagramPacket packet = new DatagramPacket(receivingBuffer, bufferSize);
+
                     while (!Thread.interrupted()) {
 
                         try {
-                            DatagramPacket packet = receivingPacket;
                             socket.receive(packet);
 
                             InetAddress remoteAddress = packet.getAddress();
@@ -267,7 +271,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     }
                     final long currTime = System.currentTimeMillis();
                     if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
-                        receiveQueue.offer(new byte[0]);
+                        receiveQueue.offer(zeroLengthByte);
                         break;
                     }
 
@@ -516,7 +520,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     checkForWaitingDatas();
                 } else if (expectSeq > seq){
                 } else {
-                    insertIntoWaitingDatas(seq, new byte[0]);
+                    insertIntoWaitingDatas(seq, zeroLengthByte);
                 }
 
                 break;
@@ -546,7 +550,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 //ignore I guess
                 break;
             case disconnect:
-                receiveQueue.offer(new byte[0]);
+                receiveQueue.offer(zeroLengthByte);
                 break;
             case connectionAcknowledgment:
                 //Ignore I guess
@@ -593,7 +597,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
 
             case disconnect:
-                receiveQueue.offer(new byte[0]);
+                receiveQueue.offer(zeroLengthByte);
                 break;
 
             default:

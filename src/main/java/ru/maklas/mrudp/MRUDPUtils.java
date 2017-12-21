@@ -28,15 +28,19 @@ class MRUDPUtils {
     }
 
     static byte[] buildPingRequest (int seq, long startTime){
-        byte[] nanos = new byte[8];
-        putLong(nanos, startTime, 0);
-        return build5byte(pingRequest, seq, nanos);
+        byte[] ret = new byte[13];
+        ret[0] = pingRequest;
+        putInt(ret, seq, 1);
+        putLong(ret, startTime, 5);
+        return ret;
     }
 
     static byte[] buildPingResponse (int seq, long startTime){
-        byte[] timeAsBytes = new byte[8];
-        putLong(timeAsBytes, startTime, 0);
-        return build5byte(pingResponse, seq, timeAsBytes);
+        byte[] ret = new byte[13];
+        ret[0] = pingResponse;
+        putInt(ret, seq, 1);
+        putLong(ret, startTime, 5);
+        return ret;
     }
 
     static byte[] buildConnectionRequest (int seq, int otherSeq, byte[] data){
