@@ -192,9 +192,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             receivingThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-
+                    UDPSocket socket = MRUDPSocketImpl.this.socket;
                     byte[] receivingBuffer = new byte[bufferSize];
                     DatagramPacket packet = new DatagramPacket(receivingBuffer, bufferSize);
+                    AtomicReference<SocketState> atomicState = MRUDPSocketImpl.this.state;
 
                     while (!Thread.interrupted()) {
 
@@ -204,10 +205,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                             InetAddress remoteAddress = packet.getAddress();
                             int remotePort = packet.getPort();
                             int dataLength = packet.getLength();
-                            //byte[] fullData = new byte[dataLength];
-                            //System.arraycopy(packet.getData(), 0, fullData, 0, dataLength);
 
-                            SocketState socketState = state.get();
+                            SocketState socketState = atomicState.get();
 
                             switch (socketState){
                                 case NOT_CONNECTED:
@@ -251,7 +250,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         updateThread.start();
     }
 
-    public void update() {
+    void update() {
         SocketState socketState = state.get();
 
         try {
