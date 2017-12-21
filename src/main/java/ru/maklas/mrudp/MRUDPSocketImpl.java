@@ -1,10 +1,11 @@
 package ru.maklas.mrudp;
 
+import ru.maklas.utils.AtomicQueue;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.Iterator;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,7 +29,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final Object requestSendingMonitor = new Object();
     private final int bufferSize;
 
-    private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
+    private final AtomicQueue<byte[]> receiveQueue = new AtomicQueue<byte[]>(10000);
     private int lastInsertedSeq = 0;
 
     private volatile boolean started = false;
@@ -270,7 +271,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     }
                     final long currTime = System.currentTimeMillis();
                     if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
-                        receiveQueue.offer(zeroLengthByte);
+                        receiveQueue.put(zeroLengthByte);
                         break;
                     }
 
@@ -279,9 +280,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         lastPingSendTime = currTime;
                     }
                     synchronized (requestList) {
-                        Iterator<SortedIntList.Node<byte[]>> savedRequests = requestList.iterator();
-                        while (savedRequests.hasNext()) {
-                            byte[] fullDataReq = savedRequests.next().value;
+                        for (SortedIntList.Node<byte[]> aRequestList : requestList) {
+                            byte[] fullDataReq = aRequestList.value;
                             sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
                         }
                     }
@@ -508,7 +508,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 if (userDataLength == 5){
                     log("Received unreliable request of 0 length! That will lead to dc");
                 }
-                receiveQueue.offer(data);
+                receiveQueue.put(data);
                 break;
             case pingRequest:
                 final long startTime = extractLong(fullPackage, 5);
@@ -552,7 +552,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 //ignore I guess
                 break;
             case disconnect:
-                receiveQueue.offer(zeroLengthByte);
+                receiveQueue.put(zeroLengthByte);
                 break;
             case connectionAcknowledgment:
                 //Ignore I guess
@@ -562,7 +562,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
         }
     }
-
 
     void receiveWhileConnecting(InetAddress address, int port, byte[] fullPackage, int packageLength){
         this.lastCommunicationTime = System.currentTimeMillis();
@@ -600,7 +599,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
 
             case disconnect:
-                receiveQueue.offer(zeroLengthByte);
+                receiveQueue.put(zeroLengthByte);
                 break;
 
             default:
@@ -651,12 +650,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.lastInsertedSeq = seq;
         byte[] userData = new byte[length];
         System.arraycopy(fullData, offset, userData, 0, length);
-        receiveQueue.offer(userData);
+        receiveQueue.put(userData);
     }
 
     private void insert(int seq, byte[] userData){
         this.lastInsertedSeq = seq;
-        receiveQueue.offer(userData);
+        receiveQueue.put(userData);
     }
 
     private final SortedIntList<byte[]> waitings = new SortedIntList<byte[]>();
