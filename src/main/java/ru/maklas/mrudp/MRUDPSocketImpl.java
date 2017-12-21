@@ -26,7 +26,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final DatagramPacket sendingPacket;
     private final DatagramPacket responsePacket;
     private final Object requestSendingMonitor = new Object();
-    private final Object responseSendingMonitor = new Object();
     private final int bufferSize;
 
     private final LinkedBlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<byte[]>();
