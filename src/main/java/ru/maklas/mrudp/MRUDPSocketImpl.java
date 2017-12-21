@@ -297,7 +297,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void sendPing() {
         int seq = this.seq.getAndIncrement();
         long currentTimeNano = System.nanoTime();
-        byte[] fullPackage = buildPingRequest(seq, currentTimeNano);
+        byte[] fullPackage = getPingRequestCACHED(seq, currentTimeNano);
         saveRequest(seq, fullPackage);
         sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
     }
@@ -452,17 +452,18 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
+    /**
+     * Only used internally in receiving thread of ServerSocket or ClientSocket
+     */
     void sendResponseData(InetAddress returnAddress, int port, byte[] fullPackage){
-        synchronized (responseSendingMonitor) {
-            DatagramPacket responsePacket = this.responsePacket;
-            responsePacket.setAddress(returnAddress);
-            responsePacket.setPort(port);
-            responsePacket.setData(fullPackage);
-            try {
-                socket.send(responsePacket);
-            } catch (Exception e) {
-                log("IOException while trying to send via DatagramSocket" + e.getMessage());
-            }
+        DatagramPacket responsePacket = this.responsePacket;
+        responsePacket.setAddress(returnAddress);
+        responsePacket.setPort(port);
+        responsePacket.setData(fullPackage);
+        try {
+            socket.send(responsePacket);
+        } catch (Exception e) {
+            log("IOException while trying to send via DatagramSocket" + e.getMessage());
         }
     }
 
@@ -482,7 +483,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         switch (settings){
             case reliableRequest:
-                byte[] resp = buildReliableResponse(seq);
+                byte[] resp = getReliableResponseCACHED(seq);
                 sendResponseData(address, port, resp);
                 final int expectedSeq = this.lastInsertedSeq + 1;
 
@@ -513,7 +514,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
             case pingRequest:
                 final long startTime = extractLong(fullPackage, 5);
-                final byte[] fullResponse = buildPingResponse(seq, startTime);
+                final byte[] fullResponse = getPingResponseCACHED(seq, startTime);
                 sendResponseData(address, port, fullResponse);
 
                 final int expectSeq = this.lastInsertedSeq + 1;
@@ -582,8 +583,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         switch (settings){
             case reliableRequest:
-                byte[] resp = buildReliableResponse(seq);
-                sendData(address, port, resp);
+                log("Got Reliable request while connecting. SHOULD NEVER HAPPEN!");
 
                 byte[] userData = new byte[packageLength - 5];
                 System.arraycopy(fullPackage, 5, userData, 0, userData.length);
@@ -748,5 +748,28 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         e.printStackTrace();
     }
 
+
+    private byte[] cachedReliableResponse = MRUDPUtils.buildReliableResponse(0);
+    private byte[] getReliableResponseCACHED(int seq){
+        byte[] reliableResponse = this.cachedReliableResponse;
+        MRUDPUtils.putInt(reliableResponse, seq, 1);
+        return reliableResponse;
+    }
+
+    private byte[] cachedPingRequest = MRUDPUtils.buildPingRequest(0, 0);
+    private byte[] getPingRequestCACHED(int seq, long startTime){
+        byte[] pingRequest = this.cachedPingRequest;
+        MRUDPUtils.putInt(pingRequest, seq, 1);
+        putLong(pingRequest, startTime, 5);
+        return pingRequest;
+    }
+
+    private byte[] cachedPingResponse = MRUDPUtils.buildPingResponse(0, 0);
+    private byte[] getPingResponseCACHED(int seq, long startTime){
+        byte[] pingResponse = this.cachedPingResponse;
+        MRUDPUtils.putInt(pingResponse, seq, 1);
+        putLong(pingResponse, startTime, 5);
+        return pingResponse;
+    }
 
 }

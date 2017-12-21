@@ -15,6 +15,8 @@ class MRUDPUtils {
     static final byte disconnect = 11;
 
 
+    private static final byte[] dcPacket = new byte[]{disconnect, 0, 0, 0, 0};
+
     static byte[] buildReliableRequest (int seq, byte [] data){
         return build5byte(reliableRequest, seq, data);
     }
@@ -65,7 +67,7 @@ class MRUDPUtils {
     }
 
     static byte[] buildDisconnect (){
-        return build5byte(disconnect, 0);
+        return dcPacket;
     }
 
     static byte[] build5byte(byte settings, int seq, byte [] data){
