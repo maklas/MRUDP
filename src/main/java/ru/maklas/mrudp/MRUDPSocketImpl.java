@@ -80,6 +80,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.lastInsertedSeq = expectSeq;
         this.seq.set(socketSeq);
         this.state.set(SocketState.CONNECTED);
+        sendingPacket.setAddress(connectedAddress);
+        sendingPacket.setPort(connectedPort);
         this.lastCommunicationTime = System.currentTimeMillis();
         this.ackDelivered = true;
         this.bufferSize = bufferSize;
@@ -100,6 +102,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         ExecutorService e = Executors.newSingleThreadExecutor();
         connectingToAddress = address;
         connectingToPort = port;
+        sendingPacket.setAddress(address);
+        sendingPacket.setPort(port);
         connectingResponse = null;
         this.lastPingSendTime = System.currentTimeMillis();
         this.seq.set(0);
@@ -109,7 +113,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         int seq = this.seq.getAndIncrement();
         byte[] fullData = buildConnectionRequest(seq, serverSequenceNumber, data);
         connectingRequest = fullData;
-        sendData(address, port, fullData);
+        sendData(fullData);
         final Future<byte[]> futureResponse = e.submit(new Callable<byte[]>() {
             @Override
             public byte[] call() throws Exception {
@@ -146,7 +150,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         ConnectionResponse connectionResponse = new ConnectionResponse(accepted ? ConnectionResponse.Type.ACCEPTED : ConnectionResponse.Type.NOT_ACCEPTED, userData);
         if (accepted) {
             ackDelivered = false;
-            sendData(connectingToAddress, connectingToPort, buildConnectionAck(seq));
+            sendData(buildConnectionAck(seq));
             state.set(SocketState.CONNECTED);
             long currentTimeAfterConnect = System.currentTimeMillis();
             this.lastCommunicationTime = currentTimeAfterConnect;
@@ -167,7 +171,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             int seq = this.seq.getAndIncrement();
             byte[] fullPackage = buildReliableRequest(seq, data);
             saveRequest(seq, fullPackage);
-            sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
+            sendData(fullPackage);
             return true;
         }
         return false;
@@ -177,7 +181,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     public boolean sendUnreliable(byte[] data) {
         if (isConnected()) {
             byte[] fullPackage = buildUnreliableRequest(data);
-            sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
+            sendData(fullPackage);
             return true;
         }
         return false;
@@ -262,12 +266,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     int connectPort = connectingToPort;
                     byte[] fullConnectData = connectingRequest;
                     if (connectAddress != null && fullConnectData != null){
-                        sendData(connectAddress, connectPort, fullConnectData);
+                        sendData(fullConnectData);
                     }
                     break;
                 case CONNECTED:
                     if (!ackDelivered){
-                        sendData(lastConnectedAddress, lastConnectedPort, buildConnectionAck(0));
+                        sendData(buildConnectionAck(0));
                         break;
                     }
                     final long currTime = System.currentTimeMillis();
@@ -283,7 +287,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     synchronized (requestList) {
                         for (SortedIntList.Node<byte[]> aRequestList : requestList) {
                             byte[] fullDataReq = aRequestList.value;
-                            sendData(lastConnectedAddress, lastConnectedPort, fullDataReq);
+                            sendData(fullDataReq);
                         }
                     }
                     break;
@@ -298,7 +302,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         long currentTimeNano = System.nanoTime();
         byte[] fullPackage = getPingRequestCACHED(seq, currentTimeNano);
         saveRequest(seq, fullPackage);
-        sendData(lastConnectedAddress, lastConnectedPort, fullPackage);
+        sendData(fullPackage);
     }
 
     @Override
@@ -307,7 +311,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             System.err.println("Closing, but not connected!");
             return false;
         }
-        sendData(lastConnectedAddress, lastConnectedPort, buildDisconnect());
+        sendData(buildDisconnect());
         state.set(SocketState.NOT_CONNECTED);
         flushBuffers();
         triggerDCListeners();
@@ -437,11 +441,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     }
 
-    void sendData(InetAddress address, int port, byte[] fullPackage){
+    void sendData(byte[] fullPackage){
         synchronized (requestSendingMonitor) {
             DatagramPacket sendingPacket = this.sendingPacket;
-            sendingPacket.setAddress(address);
-            sendingPacket.setPort(port);
             sendingPacket.setData(fullPackage);
             try {
                 socket.send(sendingPacket);

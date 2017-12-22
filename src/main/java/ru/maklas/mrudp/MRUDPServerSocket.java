@@ -75,7 +75,7 @@ public class MRUDPServerSocket {
 
                             case connectionAcknowledgment:
                                 if (subSocket != null) {
-                                    subSocket.sendData(remoteAddress, remotePort, buildConnectionAckResponse(0));
+                                    sendDataOnReceivingThread(remoteAddress, remotePort, buildConnectionAckResponse(0));
                                 } else {
                                     Object[] tuple = waitingForAckMap.remove(remoteAddress, remotePort);
                                     if (tuple == null) {
@@ -87,7 +87,7 @@ public class MRUDPServerSocket {
                                     MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
                                     connectionMap.put(remoteAddress, remotePort, mrudp);
                                     model.registerNewConnection(mrudp, userResp);
-                                    mrudp.sendData(remoteAddress, remotePort, buildConnectionAckResponse(0));
+                                    sendDataOnReceivingThread(remoteAddress, remotePort, buildConnectionAckResponse(0));
                                 }
                                 break;
 
@@ -175,6 +175,18 @@ public class MRUDPServerSocket {
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
         sendingPacket.setData(buildConnectionResponse(acceptance, seq, responseData));
+        try {
+            socket.send(sendingPacket);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendDataOnReceivingThread(InetAddress address, int port, byte[] data){
+        DatagramPacket sendingPacket = this.sendingPacket;
+        sendingPacket.setAddress(address);
+        sendingPacket.setPort(port);
+        sendingPacket.setData(data);
         try {
             socket.send(sendingPacket);
         } catch (Throwable e) {
