@@ -83,6 +83,7 @@ public class MRUDPServerSocket {
                                         break;
                                     }
 
+                                    @SuppressWarnings("unchecked")
                                     ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
                                     MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
                                     connectionMap.put(remoteAddress, remotePort, mrudp);

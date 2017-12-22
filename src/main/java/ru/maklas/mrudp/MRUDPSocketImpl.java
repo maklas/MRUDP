@@ -491,8 +491,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 if (expectedSeq == seq){
                     insert(expectedSeq, fullPackage, 5, packageLength - 5);
                     checkForWaitingDatas();
-                } else if (expectedSeq > seq){
-                } else {
+                } else if (expectedSeq < seq){
                     byte[] userData = new byte[packageLength - 5];
                     System.arraycopy(fullPackage, 5, userData, 0, userData.length);
                     insertIntoWaitingDatas(seq, userData);
@@ -523,8 +522,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 if (expectSeq == seq){
                     lastInsertedSeq = seq;
                     checkForWaitingDatas();
-                } else if (expectSeq > seq){
-                } else {
+                } else if (expectSeq < seq){
                     insertIntoWaitingDatas(seq, zeroLengthByte);
                 }
 

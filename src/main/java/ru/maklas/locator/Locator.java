@@ -191,7 +191,7 @@ public class Locator {
                 if (alreadyReceived){
                     continue;
                 } else {
-                    addressObjectMap.put(address, port, new Boolean(true));
+                    addressObjectMap.put(address, port, true);
                     byte[] userData = new byte[length - 21];
                     System.arraycopy(fullPackage, 21, userData, 0, length - 21);
                     responseNotifier.notify(new LocatorResponse(address, port, userData));

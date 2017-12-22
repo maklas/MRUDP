@@ -16,7 +16,7 @@ public class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
      * @param index Index of the element
      * @param value Element to insert
      * @return Element replaced by newly inserted element, null if nothing was replaced */
-    public E insert (int index, E value) {
+    public void insert (int index, E value) {
         if (first != null) {
             Node<E> c = first;
             // iterate to the right until we can't move any further because the next number is bigger than index
@@ -46,7 +46,6 @@ public class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
             first = nodePool.obtain(null, null, value, index);
             size++;
         }
-        return null;
     }
 
     /** Retrieves an element at a given index
