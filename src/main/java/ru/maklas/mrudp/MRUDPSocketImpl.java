@@ -14,6 +14,7 @@ import static ru.maklas.mrudp.MRUDPUtils.*;
 
 public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
+    private static volatile int threadCounter;
 
     private final AtomicReference<SocketState> state = new AtomicReference<SocketState>(SocketState.NOT_CONNECTED);
     private InetAddress lastConnectedAddress = null;
@@ -235,7 +236,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         }
                     }
                 }
-            });
+            }, "MRUDP-ClientSocket-Rec-" + threadCounter++);
 
             receivingThread.start();
         }
@@ -252,7 +253,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     }
                 }
             }
-        });
+        }, "MRUDP-ClientSocket-Upd-" + threadCounter++);
         updateThread.start();
     }
 

@@ -8,6 +8,7 @@ import java.net.SocketException;
 import static ru.maklas.mrudp.MRUDPUtils.*;
 
 public class MRUDPServerSocket {
+    private static volatile int serverCounter;
 
     private final UDPSocket socket;
     private final ServerModel model;
@@ -136,7 +137,7 @@ public class MRUDPServerSocket {
                     value.closeByServer();
                 }
             }
-        });
+        }, "MRUDP-ServerSocket-Rec" + serverCounter++);
 
         receivingThread.start();
     }

@@ -9,6 +9,8 @@ import java.util.HashMap;
 
 public class BroadcastServlet {
 
+    private static volatile int threadCounter;
+
     private final DatagramSocket socket;
     private final DatagramPacket sendingPacket;
     private final DatagramPacket receivingPacket;
@@ -31,7 +33,7 @@ public class BroadcastServlet {
             public void run() {
                 BroadcastServlet.this.run();
             }
-        });
+        }, "BroadcastServlet-" + threadCounter++);
         thread.start();
     }
 
