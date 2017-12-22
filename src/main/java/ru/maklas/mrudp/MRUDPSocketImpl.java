@@ -59,12 +59,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
-        socket = dSocket;
+        this.socket = dSocket;
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.responsePacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         this.dcTimeDueToInactivity = dcTimeDueToInactivity;
-        createdByServer = false;
-        lastCommunicationTime = System.currentTimeMillis();
+        this.createdByServer = false;
+        this.lastCommunicationTime = System.currentTimeMillis();
         this.bufferSize = bufferSize;
     }
 
@@ -96,13 +96,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, zeroLengthByte);
         }
 
-
-
         state.set(SocketState.CONNECTING);
         ExecutorService e = Executors.newSingleThreadExecutor();
         connectingToAddress = address;
         connectingToPort = port;
         connectingResponse = null;
+        this.lastPingSendTime = System.currentTimeMillis();
         this.seq.set(0);
         final int serverSequenceNumber = 0;
         lastInsertedSeq = serverSequenceNumber;
@@ -149,14 +148,16 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             ackDelivered = false;
             sendData(connectingToAddress, connectingToPort, buildConnectionAck(seq));
             state.set(SocketState.CONNECTED);
-            long currentTime = System.currentTimeMillis();
-            this.lastCommunicationTime = currentTime;
-            this.lastPingSendTime = currentTime;
+            long currentTimeAfterConnect = System.currentTimeMillis();
+            this.lastCommunicationTime = currentTimeAfterConnect;
+            this.currentPing = ((float) (lastPingSendTime - currentTimeAfterConnect))/1000000f;
+            this.lastPingSendTime = currentTimeAfterConnect;
             this.lastConnectedAddress = address;
             this.lastConnectedPort = port;
         } else {
             state.set(SocketState.NOT_CONNECTED);
         }
+
         return connectionResponse;
     }
 
