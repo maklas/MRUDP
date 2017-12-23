@@ -155,7 +155,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             state.set(SocketState.CONNECTED);
             long currentTimeAfterConnect = System.currentTimeMillis();
             this.lastCommunicationTime = currentTimeAfterConnect;
-            this.currentPing = ((float) (lastPingSendTime - currentTimeAfterConnect))/1000000f;
+            this.currentPing = ((float) (currentTimeAfterConnect - lastPingSendTime))/1000000f;
             this.lastPingSendTime = currentTimeAfterConnect;
             this.lastConnectedAddress = address;
             this.lastConnectedPort = port;
@@ -336,6 +336,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             receivingThread.interrupt();
         }
         socket.close();
+        flushBuffers();
     }
 
     private void flushBuffers() {
