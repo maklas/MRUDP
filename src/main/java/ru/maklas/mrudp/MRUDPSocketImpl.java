@@ -324,18 +324,21 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         if (updateThread != null){
             updateThread.interrupt();
         }
+        flushBuffers();
     }
 
     @Override
     public void close() {
-        disconnect();
         if (updateThread != null){
             updateThread.interrupt();
         }
         if (receivingThread != null){
             receivingThread.interrupt();
         }
-        socket.close();
+        disconnect();
+        if (!createdByServer) {
+            socket.close();
+        }
         flushBuffers();
     }
 
