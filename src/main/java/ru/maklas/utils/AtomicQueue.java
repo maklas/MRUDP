@@ -40,6 +40,9 @@ public class AtomicQueue<T> {
     }
 
     public void clear() {
-
+        T poll = poll();
+        while (poll != null){
+            poll = poll();
+        }
     }
 }
