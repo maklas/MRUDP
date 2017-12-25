@@ -178,6 +178,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
+    public boolean sendOff5(byte[] dataWithOffset5){
+        if (isConnected()) {
+            int seq = this.seq.getAndIncrement();
+            appendReliableRequest(seq, dataWithOffset5);
+            saveRequest(seq, dataWithOffset5);
+            sendData(dataWithOffset5);
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public boolean sendUnreliable(byte[] data) {
         if (isConnected()) {
@@ -263,10 +274,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         try {
             switch (socketState){
                 case CONNECTING:
-                    InetAddress connectAddress = connectingToAddress;
-                    int connectPort = connectingToPort;
                     byte[] fullConnectData = connectingRequest;
-                    if (connectAddress != null && fullConnectData != null){
+                    if (connectingToAddress != null && fullConnectData != null){
                         sendData(fullConnectData);
                     }
                     break;

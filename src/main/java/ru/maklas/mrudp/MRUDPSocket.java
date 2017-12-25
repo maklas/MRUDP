@@ -12,6 +12,8 @@ public interface MRUDPSocket {
 
     boolean send(byte[] data);
 
+    boolean sendOff5(byte[] dataWithOffset5);
+
     boolean sendUnreliable(byte[] data);
 
     void start(final int updateThreadSleepTimeMS);
