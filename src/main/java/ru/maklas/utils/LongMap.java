@@ -1,5 +1,7 @@
 package ru.maklas.utils;
 
+import ru.maklas.mrudp.Array;
+
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -662,6 +664,21 @@ public class LongMap<V> implements Iterable<LongMap.Entry<V>> {
         keys2.valid = true;
         keys1.valid = false;
         return keys2;
+    }
+
+    public V[] copyValues() {
+        V[] valueTable = this.valueTable;
+        Array<V> arr = new Array<V>();
+        for (V v : valueTable) {
+            if (v != null){
+                arr.add(v);
+            }
+        }
+        if (hasZeroValue){
+            arr.add(zeroValue);
+        }
+
+        return arr.shrink();
     }
 
     static public class Entry<V> {

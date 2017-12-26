@@ -12,7 +12,7 @@ public class MRUDPServerSocket {
 
     private final UDPSocket socket;
     private final ServerModel model;
-    private final AddressObjectMap<MRUDPSocketImpl> connectionMap = new AddressObjectMap<MRUDPSocketImpl>();
+    private final AddressObjectMap<MRUDPSocketImpl> connectionMap = AddressObjectMap.synchronize(new AddressObjectMap<MRUDPSocketImpl>());
     private final AddressObjectMap<Object[]> waitingForAckMap = new AddressObjectMap<Object[]>();
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
@@ -42,7 +42,7 @@ public class MRUDPServerSocket {
             @Override
             public void run() {
 
-                AddressObjectMap<MRUDPSocketImpl> connectionMap = MRUDPServerSocket.this.connectionMap;
+                final AddressObjectMap<MRUDPSocketImpl> connectionMap = MRUDPServerSocket.this.connectionMap;
                 final byte[] receivingBuffer = new byte[bufferSize];
                 final DatagramPacket packet = new DatagramPacket(receivingBuffer, bufferSize);
 
@@ -86,7 +86,19 @@ public class MRUDPServerSocket {
 
                                     @SuppressWarnings("unchecked")
                                     ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
-                                    MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                    final MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                    mrudp.addListener(new MRUDPListener() {
+                                        @Override
+                                        public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
+                                            connectionMap.remove(mrudp.getRemoteAddress(), mrudp.getRemotePort());
+                                            model.onSocketDisconnected(mrudp);
+                                        }
+
+                                        @Override
+                                        public void onPingUpdated(float newPing) {
+
+                                        }
+                                    });
                                     connectionMap.put(remoteAddress, remotePort, mrudp);
                                     model.registerNewConnection(mrudp, userResp);
                                     sendDataOnReceivingThread(remoteAddress, remotePort, buildConnectionAckResponse(0));
@@ -97,7 +109,6 @@ public class MRUDPServerSocket {
                                 if (subSocket != null) {
                                     connectionMap.remove(remoteAddress, remotePort);
                                     subSocket.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
-                                    model.onSocketDisconnected(subSocket);
                                     subSocket.closeByServer();
                                 } else {
                                     waitingForAckMap.remove(remoteAddress, remotePort);
@@ -132,7 +143,7 @@ public class MRUDPServerSocket {
                     }
                 }
 
-                Iterable<MRUDPSocketImpl> values = connectionMap.values(new MRUDPSocketImpl[0]);
+                MRUDPSocketImpl[] values = connectionMap.values(new MRUDPSocketImpl[0]);
                 for (MRUDPSocketImpl value : values) {
                     value.closeByServer();
                 }

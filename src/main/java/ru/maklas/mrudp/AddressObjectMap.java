@@ -18,12 +18,8 @@ public class AddressObjectMap<T> {
         return map.get(hash(address, port));
     }
 
-    private static final long hash(InetAddress address, int port){
-        byte[] addressBytes = address.getAddress();
-        long ret =    addressBytes[0] << 24         |
-                (addressBytes[1] & 0xFF) << 16 |
-                (addressBytes[2] & 0xFF) << 8  |
-                (addressBytes[3] & 0xFF);
+    private static long hash(InetAddress address, int port){
+        long ret = address.hashCode();
         ret += ((long) port) << 32;
         return ret;
     }
@@ -32,8 +28,8 @@ public class AddressObjectMap<T> {
         return map.remove(hash(address, port));
     }
 
-    public Iterable<T> values(T[] type) {
-        return map.values();
+    public T[] values(T[] type) {
+        return map.copyValues();
     }
     
     public void putNew(InetAddress address, int port, T val){
@@ -43,4 +39,54 @@ public class AddressObjectMap<T> {
     public void clear() {
         map.clear();
     }
+
+
+    public static <T> AddressObjectMap synchronize(final AddressObjectMap<T> map){
+
+        return new AddressObjectMap<T>(){
+            @Override
+            public void put(InetAddress address, int port, T o) {
+                synchronized (this){
+                    map.put(address, port, o);
+                }
+            }
+
+            @Override
+            public T get(InetAddress address, int port) {
+                synchronized (this){
+                    return map.get(address, port);
+                }
+            }
+
+            @Override
+            public T remove(InetAddress address, int port) {
+                synchronized (this){
+                    return map.remove(address, port);
+                }
+            }
+
+            @Override
+            public T[] values(T[] type) {
+                synchronized (this){
+                    return map.values(type);
+                }
+            }
+
+            @Override
+            public void putNew(InetAddress address, int port, T val) {
+                synchronized (this){
+                    map.putNew(address, port, val);
+                }
+            }
+
+            @Override
+            public void clear() {
+                synchronized (this) {
+                    map.clear();
+                }
+            }
+        };
+    }
+
+
 }
