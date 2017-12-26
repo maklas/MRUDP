@@ -92,7 +92,6 @@ public class MRUDPServerSocket {
                                         public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
                                             connectionMap.remove(mrudp.getRemoteAddress(), mrudp.getRemotePort());
                                             model.onSocketDisconnected(mrudp);
-                                            mrudp.closeByServer();
                                         }
 
                                         @Override
@@ -142,10 +141,11 @@ public class MRUDPServerSocket {
                     }
                 }
 
-                MRUDPSocketImpl[] values = connectionMap.values(new MRUDPSocketImpl[0]);
+                Iterable<MRUDPSocketImpl> values = connectionMap.values();
                 for (MRUDPSocketImpl value : values) {
-                    value.closeByServer();
+                    value.serverStopped();
                 }
+
             }
         }, "MRUDP-ServerSocket-Rec" + serverCounter++);
 

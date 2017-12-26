@@ -317,36 +317,19 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public boolean disconnect() {
-        if (!isConnected()){
-            System.err.println("Closing, but not connected!");
-            return false;
+        if (createdByServer){
+            return dcOrCloseByServer();
+        } else {
+            return disconnectByClient();
         }
-        sendData(buildDisconnect());
-        state.set(SocketState.NOT_CONNECTED);
-        flushBuffers();
-        triggerDCListeners();
-        return true;
-    }
-
-    void closeByServer(){
-        state.set(SocketState.NOT_CONNECTED);
-        if (updateThread != null){
-            updateThread.interrupt();
-        }
-        flushBuffers();
     }
 
     @Override
     public void close() {
-        if (updateThread != null){
-            updateThread.interrupt();
-        }
-        if (receivingThread != null){
-            receivingThread.interrupt();
-        }
-        disconnect();
-        if (!createdByServer) {
-            socket.close();
+        if (createdByServer){
+            dcOrCloseByServer();
+        } else {
+            closeByClient();
         }
     }
 
@@ -407,9 +390,11 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             byte[] poll = receiveQueue.poll();
             while (poll != null){
                 if (poll.length == 0){
-                    state.set(SocketState.NOT_CONNECTED);
-                    flushBuffers();
-                    triggerDCListeners();
+                    if (createdByServer){
+                        receivedDCByServer();
+                    } else {
+                        receivedDCByClient();
+                    }
                     break;
                 }
                 processor.process(poll, this, this);
@@ -695,8 +680,73 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
 
 
+    /* CLOSING OPERATIONS */
 
+    private void interruptUpdateThread(){
+        if (updateThread != null){
+            updateThread.interrupt();
+        }
+    }
 
+    private void interruptReceivingThread(){
+        if (receivingThread != null){
+            receivingThread.interrupt();
+        }
+    }
+
+    private boolean disconnectByClient(){
+        if (isConnected()){
+            sendData(buildDisconnect());
+            state.set(SocketState.NOT_CONNECTED);
+            flushBuffers();
+            triggerDCListeners();
+            return true;
+        }
+        return false;
+    }
+
+    private void closeByClient(){
+        disconnectByClient();
+        interruptUpdateThread();
+        interruptReceivingThread();
+        socket.close();
+    }
+
+    private void receivedDCByClient(){
+        state.set(SocketState.NOT_CONNECTED);
+        flushBuffers();
+        triggerDCListeners();
+    }
+
+    private boolean dcOrCloseByServer(){
+        if (isConnected()){
+            sendData(buildDisconnect());
+            state.set(SocketState.NOT_CONNECTED);
+            flushBuffers();
+            interruptUpdateThread();
+            triggerDCListeners();
+            return true;
+        }
+        return false;
+    }
+
+    private void receivedDCByServer(){
+        if (isConnected()) {
+            state.set(SocketState.NOT_CONNECTED);
+            flushBuffers();
+            interruptUpdateThread();
+            flushBuffers();
+            triggerDCListeners();
+        }
+    }
+
+    void serverStopped(){
+        sendData(buildDisconnect());
+        state.set(SocketState.NOT_CONNECTED);
+        flushBuffers();
+        interruptUpdateThread();
+        triggerDCListeners();
+    }
 
 
 

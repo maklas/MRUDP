@@ -28,8 +28,8 @@ public class AddressObjectMap<T> {
         return map.remove(hash(address, port));
     }
 
-    public T[] values(T[] type) {
-        return map.copyValues();
+    public Iterable<T> values() {
+        return map.values();
     }
     
     public void putNew(InetAddress address, int port, T val){
@@ -64,9 +64,14 @@ public class AddressObjectMap<T> {
         }
 
         @Override
-        public T[] values(T[] type) {
+        public Iterable<T> values() {
             synchronized (this){
-                return super.values(type);
+                Iterable<T> values = super.values();
+                Array<T> copy = new Array<T>();
+                for (T value : values) {
+                    copy.add(value);
+                }
+                return copy;
             }
         }
 
