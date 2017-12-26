@@ -348,7 +348,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         if (!createdByServer) {
             socket.close();
         }
-        flushBuffers();
     }
 
     private void flushBuffers() {

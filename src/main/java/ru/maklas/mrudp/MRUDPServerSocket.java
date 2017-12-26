@@ -12,7 +12,7 @@ public class MRUDPServerSocket {
 
     private final UDPSocket socket;
     private final ServerModel model;
-    private final AddressObjectMap<MRUDPSocketImpl> connectionMap = AddressObjectMap.synchronize(new AddressObjectMap<MRUDPSocketImpl>());
+    private final AddressObjectMap<MRUDPSocketImpl> connectionMap = new AddressObjectMap.Synchronized<MRUDPSocketImpl>();
     private final AddressObjectMap<Object[]> waitingForAckMap = new AddressObjectMap<Object[]>();
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
@@ -92,6 +92,7 @@ public class MRUDPServerSocket {
                                         public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
                                             connectionMap.remove(mrudp.getRemoteAddress(), mrudp.getRemotePort());
                                             model.onSocketDisconnected(mrudp);
+                                            mrudp.closeByServer();
                                         }
 
                                         @Override
@@ -107,9 +108,7 @@ public class MRUDPServerSocket {
 
                             case disconnect:
                                 if (subSocket != null) {
-                                    connectionMap.remove(remoteAddress, remotePort);
                                     subSocket.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
-                                    subSocket.closeByServer();
                                 } else {
                                     waitingForAckMap.remove(remoteAddress, remotePort);
                                 }

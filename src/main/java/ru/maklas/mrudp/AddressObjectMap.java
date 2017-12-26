@@ -41,51 +41,48 @@ public class AddressObjectMap<T> {
     }
 
 
-    public static <T> AddressObjectMap synchronize(final AddressObjectMap<T> map){
-
-        return new AddressObjectMap<T>(){
-            @Override
-            public void put(InetAddress address, int port, T o) {
-                synchronized (this){
-                    map.put(address, port, o);
-                }
+    public static class Synchronized<T> extends AddressObjectMap<T> {
+        @Override
+        public void put(InetAddress address, int port, T o) {
+            synchronized (this){
+                super.put(address, port, o);
             }
+        }
 
-            @Override
-            public T get(InetAddress address, int port) {
-                synchronized (this){
-                    return map.get(address, port);
-                }
+        @Override
+        public T get(InetAddress address, int port) {
+            synchronized (this){
+                return super.get(address, port);
             }
+        }
 
-            @Override
-            public T remove(InetAddress address, int port) {
-                synchronized (this){
-                    return map.remove(address, port);
-                }
+        @Override
+        public T remove(InetAddress address, int port) {
+            synchronized (this){
+                return super.remove(address, port);
             }
+        }
 
-            @Override
-            public T[] values(T[] type) {
-                synchronized (this){
-                    return map.values(type);
-                }
+        @Override
+        public T[] values(T[] type) {
+            synchronized (this){
+                return super.values(type);
             }
+        }
 
-            @Override
-            public void putNew(InetAddress address, int port, T val) {
-                synchronized (this){
-                    map.putNew(address, port, val);
-                }
+        @Override
+        public void putNew(InetAddress address, int port, T val) {
+            synchronized (this){
+                super.putNew(address, port, val);
             }
+        }
 
-            @Override
-            public void clear() {
-                synchronized (this) {
-                    map.clear();
-                }
+        @Override
+        public void clear() {
+            synchronized (this) {
+                super.clear();
             }
-        };
+        }
     }
 
 
