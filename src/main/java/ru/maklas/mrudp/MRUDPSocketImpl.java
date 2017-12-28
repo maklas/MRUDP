@@ -31,7 +31,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final int bufferSize;
 
     private final AtomicQueue<byte[]> receiveQueue = new AtomicQueue<byte[]>(10000);
-    private int lastInsertedSeq = 0;
+    private volatile int lastInsertedSeq = 0;
 
     private volatile boolean started = false;
     private boolean interrupted = false;
@@ -89,7 +89,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public ConnectionResponse connect(int timeout, InetAddress address, int port, byte[] data) {
+    public ConnectionResponse connect(int timeout, InetAddress address, int port, final byte[] data) {
         if (address == null || port < 0) {
             throw new NullPointerException();
         }
@@ -106,7 +106,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         sendingPacket.setAddress(address);
         sendingPacket.setPort(port);
         connectingResponse = null;
-        this.lastPingSendTime = System.currentTimeMillis();
+        final long connectStartTime = System.currentTimeMillis();
+        this.lastPingSendTime = connectStartTime;
         this.seq.set(0);
         final int serverSequenceNumber = 0;
         lastInsertedSeq = serverSequenceNumber;
@@ -120,9 +121,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             public byte[] call() throws Exception {
                 byte[] ret = connectingResponse;
                 while (ret == null){
-                    Thread.sleep(20);
+                    Thread.sleep(5);
                     ret = connectingResponse;
                 }
+                currentPing = (float)(System.currentTimeMillis() - connectStartTime);
                 return ret;
             }
         });
@@ -155,7 +157,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             state.set(SocketState.CONNECTED);
             long currentTimeAfterConnect = System.currentTimeMillis();
             this.lastCommunicationTime = currentTimeAfterConnect;
-            this.currentPing = ((float) (currentTimeAfterConnect - lastPingSendTime))/1000000f;
             this.lastPingSendTime = currentTimeAfterConnect;
             this.lastConnectedAddress = address;
             this.lastConnectedPort = port;
@@ -334,9 +335,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void flushBuffers() {
-        waitings.clear();
-        requestList.clear();
-        receiveQueue.clear();
+        synchronized (waitings) {
+            waitings.clear();
+        }
+        synchronized (requestList) {
+            requestList.clear();
+        }
+        if (!isProcessing())
+            receiveQueue.clear();
     }
 
     @Override
@@ -391,9 +397,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             while (poll != null){
                 if (poll.length == 0){
                     if (createdByServer){
-                        receivedDCByServer();
+                        receivedDCByServerOrTimeOut();
                     } else {
-                        receivedDCByClient();
+                        receivedDCByClientOrTimeOut();
                     }
                     break;
                 }
@@ -529,8 +535,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 final long startingTime = extractLong(fullPackage, 5);
                 boolean removed = removeRequest(seq);
                 if (removed){
-                    long currentTime = System.nanoTime();
-                    float ping = ((float) (currentTime - startingTime))/1000000f;
+                    float ping = ((float) (System.nanoTime() - startingTime))/1000000f;
                     this.currentPing = ping;
                     triggerPingListeners(ping);
                 }
@@ -688,6 +693,24 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
+    private void interruptUpdateThreadAndJoin(int wait){
+        if (updateThread != null){
+            try {
+                updateThread.interrupt();
+                updateThread.join(wait);
+            } catch (InterruptedException e) {}
+        }
+    }
+
+    private void interruptReceivingThreadAndJoin(int wait){
+        if (updateThread != null){
+            try {
+                updateThread.interrupt();
+                updateThread.join(wait);
+            } catch (InterruptedException e) {}
+        }
+    }
+
     private void interruptReceivingThread(){
         if (receivingThread != null){
             receivingThread.interrupt();
@@ -706,17 +729,23 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void closeByClient(){
-        disconnectByClient();
         interruptUpdateThread();
         interruptReceivingThread();
+        disconnectByClient();
+        state.set(SocketState.NOT_CONNECTED);
+        flushBuffers();
         socket.close();
     }
 
-    private void receivedDCByClient(){
-        state.set(SocketState.NOT_CONNECTED);
-        flushBuffers();
-        triggerDCListeners();
+    private void receivedDCByClientOrTimeOut(){
+        if (isConnected()) {
+            sendData(buildDisconnect());
+            state.set(SocketState.NOT_CONNECTED);
+            flushBuffers();
+            triggerDCListeners();
+        }
     }
+
 
     private boolean dcOrCloseByServer(){
         if (isConnected()){
@@ -730,7 +759,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
-    private void receivedDCByServer(){
+    private void receivedDCByServerOrTimeOut(){
         if (isConnected()) {
             state.set(SocketState.NOT_CONNECTED);
             flushBuffers();
@@ -743,8 +772,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     void serverStopped(){
         sendData(buildDisconnect());
         state.set(SocketState.NOT_CONNECTED);
-        flushBuffers();
         interruptUpdateThread();
+        flushBuffers();
         triggerDCListeners();
     }
 
@@ -802,7 +831,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     /* UTILS */
 
     private void log(String msg){
-        System.err.println(msg);
+        //-- System.err.println(msg);
     }
 
     private void log(Throwable e){

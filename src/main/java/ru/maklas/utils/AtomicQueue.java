@@ -11,6 +11,7 @@ public class AtomicQueue<T> {
     private final AtomicInteger writeIndex = new AtomicInteger();
     private final AtomicInteger readIndex = new AtomicInteger();
     private final AtomicReferenceArray<T> queue;
+    private final Object puttingMonitor = new Object();
 
     public AtomicQueue (int capacity) {
         queue = new AtomicReferenceArray(capacity);
@@ -21,13 +22,15 @@ public class AtomicQueue<T> {
     }
 
     public boolean put (T value) {
-        int write = writeIndex.get();
-        int read = readIndex.get();
-        int next = next(write);
-        if (next == read) return false;
-        queue.set(write, value);
-        writeIndex.set(next);
-        return true;
+        synchronized (puttingMonitor) {
+            int write = writeIndex.get();
+            int read = readIndex.get();
+            int next = next(write);
+            if (next == read) return false;
+            queue.set(write, value);
+            writeIndex.set(next);
+            return true;
+        }
     }
 
     public T poll () {

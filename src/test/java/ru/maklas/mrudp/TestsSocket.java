@@ -206,6 +206,7 @@ public class TestsSocket {
 
         ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{1, 2, 3});
         System.out.println(connect);
+        System.out.println("Ping to server: " + client.getPing());
 
         new Thread(new Tester("Client", client, new SocketProcessor() {
             @Override
