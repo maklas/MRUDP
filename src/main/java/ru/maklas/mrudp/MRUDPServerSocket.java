@@ -13,7 +13,7 @@ public class MRUDPServerSocket {
     private final UDPSocket socket;
     private final ServerModel model;
     private final AddressObjectMap<MRUDPSocketImpl> connectionMap = new AddressObjectMap.Synchronized<MRUDPSocketImpl>();
-    private final AddressObjectMap<Object[]> waitingForAckMap = new AddressObjectMap<Object[]>();
+    private final AddressObjectMap<Object[]> waitingForAckMa = new AddressObjectMap<Object[]>(); //responsePackage, socket, request
     private final DatagramPacket sendingPacket;
     private final int dcTimeDueToInactivity;
     private final int bufferSize;
@@ -78,15 +78,16 @@ public class MRUDPServerSocket {
                                 if (subSocket != null) {
                                     sendDataOnReceivingThread(remoteAddress, remotePort, buildConnectionAckResponse(0));
                                 } else {
-                                    Object[] tuple = waitingForAckMap.remove(remoteAddress, remotePort);
-                                    if (tuple == null) {
+                                    Object[] tripple = waitingForAckMa.remove(remoteAddress, remotePort);
+                                    if (tripple == null) {
                                         System.err.println("Socket for ack not found!");
                                         break;
                                     }
 
                                     @SuppressWarnings("unchecked")
-                                    ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tuple[0];
-                                    final MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                    ConnectionResponsePackage<byte[]> userResp = (ConnectionResponsePackage<byte[]>) tripple[0];
+                                    final MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tripple[1];
+                                    final byte[] clientRequest = (byte[]) tripple[2];
                                     mrudp.addListener(new MRUDPListener() {
                                         @Override
                                         public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
@@ -100,7 +101,7 @@ public class MRUDPServerSocket {
                                         }
                                     });
                                     connectionMap.put(remoteAddress, remotePort, mrudp);
-                                    model.registerNewConnection(mrudp, userResp);
+                                    model.registerNewConnection(mrudp, userResp, clientRequest);
                                     sendDataOnReceivingThread(remoteAddress, remotePort, buildConnectionAckResponse(0));
                                 }
                                 break;
@@ -109,16 +110,16 @@ public class MRUDPServerSocket {
                                 if (subSocket != null) {
                                     subSocket.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
                                 } else {
-                                    waitingForAckMap.remove(remoteAddress, remotePort);
+                                    waitingForAckMa.remove(remoteAddress, remotePort);
                                 }
 
                             default:
                                 if (subSocket != null) {
                                     subSocket.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
                                 } else {
-                                    Object[] tuple = waitingForAckMap.get(remoteAddress, remotePort);
-                                    if (tuple != null) {
-                                        MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tuple[1];
+                                    Object[] tripple = waitingForAckMa.get(remoteAddress, remotePort);
+                                    if (tripple != null) {
+                                        MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tripple[1];
                                         mrudp.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
                                     } else {
                                         byte[] userData = new byte[dataLength - 5];
@@ -153,9 +154,9 @@ public class MRUDPServerSocket {
     }
 
     private void dealWithNewConnectionRequest(final InetAddress address, int port, byte[] fullData) {
-        Object[] tuple = waitingForAckMap.get(address, port);
-        if (tuple != null) {
-            MRUDPSocketImpl sock = (MRUDPSocketImpl) tuple[1];
+        Object[] tripple = waitingForAckMa.get(address, port);
+        if (tripple != null) {
+            MRUDPSocketImpl sock = (MRUDPSocketImpl) tripple[1];
             sock.receiveConnected(address, port, fullData, fullData.length);
             return;
         }
@@ -176,7 +177,7 @@ public class MRUDPServerSocket {
         int expectSeq = extractInt(fullData, 5);
         if (isValid){
             final MRUDPSocketImpl socket = new MRUDPSocketImpl(this.socket, bufferSize, address, port, socketSeq + 1, expectSeq, response, dcTimeDueToInactivity);
-            waitingForAckMap.put(address, port, new Object[]{connectionResponsePackage, socket});
+            waitingForAckMa.put(address, port, new Object[]{connectionResponsePackage, socket, userData});
         }
 
         sendConnectionResponse(address, port, socketSeq, isValid, response);

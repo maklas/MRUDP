@@ -24,7 +24,7 @@ public class TestsSocket {
             }
 
             @Override
-            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage) {
+            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage, byte[] userData) {
                 System.out.println("Registering new connection");
                 socket.start(50);
                 new Thread(new Runnable() {
@@ -160,7 +160,7 @@ public class TestsSocket {
             }
 
             @Override
-            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage) {
+            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage, byte[] userData) {
                 System.out.println("Server registered.");
                 socket.start(75);
                 new Thread(new Tester("ServerC", socket, new SocketProcessor() {
