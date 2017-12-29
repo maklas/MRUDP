@@ -18,7 +18,7 @@ public interface MRUDPSocket {
 
     void start(final int updateThreadSleepTimeMS);
 
-    void receive(SocketProcessor processor);
+    boolean receive(SocketProcessor processor);
 
     void addListener(MRUDPListener listener);
 

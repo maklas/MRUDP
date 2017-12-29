@@ -384,8 +384,11 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
+    /**
+     * @return True if got interrupted in the middle of the process
+     */
     @Override
-    public void receive(SocketProcessor processor) {
+    public boolean receive(SocketProcessor processor) {
         if (processing){
             throw new RuntimeException("Can't be processed by 2 threads at the same time");
         }
@@ -414,6 +417,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             log(t);
         }
         processing = false;
+        return interrupted;
     }
 
     @Override
