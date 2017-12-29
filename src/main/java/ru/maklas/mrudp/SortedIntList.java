@@ -1,6 +1,6 @@
 package ru.maklas.mrudp;
 
-public class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
+class SortedIntList<E> implements Iterable<SortedIntList.Node<E>> {
     private NodePool<E> nodePool = new NodePool<E>(); // avoid allocating nodes
     private Iterator iterator;
     int size = 0;

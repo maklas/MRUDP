@@ -2,7 +2,7 @@ package ru.maklas.mrudp;
 
 /** A pool of objects that can be reused to avoid allocation.
  * @author Nathan Sweet */
-abstract public class Pool<T> {
+abstract class Pool<T> {
     /** The maximum number of objects that will be pooled. */
     public final int max;
     /** The highest number of free objects. Can be reset any time. */

@@ -2,6 +2,11 @@ package ru.maklas.mrudp;
 
 import java.net.InetAddress;
 
+/**
+ * Map that can store Objects by InetAddress+port value. Does not produce allocations.
+ * <b>Warning: </b> Using hash of InetAddress, meaning no IPv6 must be used!
+ * @param <T>
+ */
 public class AddressObjectMap<T> {
 
     private final LongMap<T> map = new LongMap<T>();

@@ -57,10 +57,23 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private Thread updateThread;
     private Thread receivingThread;
 
+    /**
+     * Sumple constructor
+     * @param bufferSize Size of datagram packets. Note that MRUDP has 5 bytes overhead. Use maximum size of your byte[] to be sent + 5 to set this parameter.
+     * @throws Exception In case UDP socket can't be opened.
+     */
     public MRUDPSocketImpl(int bufferSize) throws Exception{
         this(new JavaUDPSocket(), bufferSize, 12 * 1000);
     }
 
+    /**
+     * Complex constructor
+     * @param dSocket UDPSocket implementation which is used for udp data sending
+     * @param bufferSize Size of datagram packets. Note that MRUDP has 5 bytes overhead. Use maximum size of your byte[] to be sent + 5 to set this parameter.
+     * @param dcTimeDueToInactivity Time in milliseconds. If socket on the other end doesn't response for specified time,
+     *                              socket will be closed.
+     *                              Note that{@link MRUDPSocket#setPingUpdateTime(int)} must be a smaller value to keep constant connection.
+     */
     public MRUDPSocketImpl(UDPSocket dSocket, int bufferSize, int dcTimeDueToInactivity) {
         this.socket = dSocket;
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
@@ -71,6 +84,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.bufferSize = bufferSize;
     }
 
+    /**
+     * Private constructor which is used to create server sub-sockets
+     */
     MRUDPSocketImpl(UDPSocket socket, int bufferSize, InetAddress connectedAddress, int connectedPort, int socketSeq, int expectSeq, byte[] responseForConnect, int dcTimeDueToInactivity) {
         this.socket = socket;
         this.sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);

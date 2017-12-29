@@ -20,10 +20,25 @@ public class MRUDPServerSocket {
     private Thread receivingThread;
     private volatile boolean started = false;
 
+    /**
+     * Simple constructor
+     * @param port Listening port
+     * @param bufferSize BufferSize for every subsocket
+     * @param model Model which is used to validate and register new connection
+     * @throws Exception In case UDP socket can't be opened on desired port
+     */
     public MRUDPServerSocket(int port, int bufferSize, ServerModel model) throws Exception{
         this(new JavaUDPSocket(port), bufferSize, model, 12 * 1000);
     }
 
+    /**
+     * Complex constructor
+     * @param socket UDPSocket implementation which is used for udp data sending
+     * @param bufferSize Buffer size for request and response packages
+     * @param model Model which is used to validate and register new connection
+     * @param dcTimeDueToInactivity Time in milliseconds. If socket on the other end doesn't response for specified time,
+     *                              socket will be closed. This parameter is for every sub-socket that this ServerSocket will create
+     */
     public MRUDPServerSocket(UDPSocket socket, int bufferSize, ServerModel model, int dcTimeDueToInactivity) {
         this.bufferSize = bufferSize;
         this.socket = socket;
