@@ -1,7 +1,5 @@
 package ru.maklas.mrudp;
 
-import ru.maklas.mrudp.UDPSocket;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 
@@ -44,5 +42,10 @@ public class PacketLossUDPSocket implements UDPSocket{
     @Override
     public void close() {
         socket.close();
+    }
+
+    @Override
+    public boolean isClosed() {
+        return socket.isClosed();
     }
 }

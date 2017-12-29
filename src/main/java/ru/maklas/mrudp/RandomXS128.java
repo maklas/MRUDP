@@ -1,8 +1,8 @@
-package ru.maklas.utils;
+package ru.maklas.mrudp;
 
 import java.util.Random;
 
-public class RandomXS128 extends Random {
+class RandomXS128 extends Random {
 
     /** Normalization constant for double. */
     private static final double NORM_DOUBLE = 1.0 / (1L << 53);

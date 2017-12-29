@@ -7,6 +7,7 @@ import java.net.SocketException;
 
 /**
  * Created by amaklakov on 02.11.2017.
+ * Java DatagramSocket implementation
  */
 public class JavaUDPSocket implements UDPSocket {
 
@@ -44,5 +45,10 @@ public class JavaUDPSocket implements UDPSocket {
     @Override
     public void close() {
         socket.close();
+    }
+
+    @Override
+    public boolean isClosed() {
+        return socket.isClosed();
     }
 }

@@ -1,7 +1,5 @@
 package ru.maklas.mrudp;
 
-import ru.maklas.mrudp.UDPSocket;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -120,5 +118,10 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
             this.port = port;
             this.data = data;
         }
+    }
+
+    @Override
+    public boolean isClosed() {
+        return delegate.isClosed();
     }
 }

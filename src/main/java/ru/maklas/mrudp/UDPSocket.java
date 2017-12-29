@@ -6,6 +6,7 @@ import java.net.SocketException;
 
 /**
  * Created by amaklakov on 02.11.2017.
+ * Interface, abstracting DatagramSocket and allowing to replace implementation with some custom code
  */
 public interface UDPSocket {
 
@@ -31,4 +32,8 @@ public interface UDPSocket {
      */
     void close();
 
+    /**
+     * @return Whether this socket is closed.
+     */
+    boolean isClosed();
 }

@@ -32,6 +32,9 @@ public class MRUDPServerSocket {
         this.dcTimeDueToInactivity = dcTimeDueToInactivity;
     }
 
+    /**
+     * Starts receiving thread for this socket.
+     */
     public void start(){
         if (started){
             log("Can't start ServerSocket twice. Forbidden");
@@ -90,13 +93,13 @@ public class MRUDPServerSocket {
                                     final byte[] clientRequest = (byte[]) tripple[2];
                                     mrudp.addListener(new MRUDPListener() {
                                         @Override
-                                        public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
+                                        public void onDisconnect(MRUDPSocket mrudpSocket) {
                                             connectionMap.remove(mrudp.getRemoteAddress(), mrudp.getRemotePort());
                                             model.onSocketDisconnected(mrudp);
                                         }
 
                                         @Override
-                                        public void onPingUpdated(float newPing) {
+                                        public void onPingUpdated(MRUDPSocket mrudpSocket, float newPing) {
 
                                         }
                                     });
@@ -215,6 +218,9 @@ public class MRUDPServerSocket {
         t.printStackTrace();
     }
 
+    /**
+     * Disconnects and closes all sockets created by server
+     */
     public void close(){
         if (receivingThread != null){
             receivingThread.interrupt();

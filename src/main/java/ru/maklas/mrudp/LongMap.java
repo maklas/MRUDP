@@ -1,6 +1,4 @@
-package ru.maklas.utils;
-
-import ru.maklas.mrudp.Array;
+package ru.maklas.mrudp;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -12,7 +10,7 @@ import java.util.NoSuchElementException;
  * depending on hash collisions. Load factors greater than 0.91 greatly increase the chances the map will have to rehash to the
  * next higher POT size.
  * @author Nathan Sweet */
-public class LongMap<V> implements Iterable<LongMap.Entry<V>> {
+class LongMap<V> implements Iterable<LongMap.Entry<V>> {
     private static final int PRIME1 = 0xbe1f14b1;
     private static final int PRIME2 = 0xb4b82e39;
     private static final int PRIME3 = 0xced1c241;

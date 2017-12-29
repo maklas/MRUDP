@@ -1,17 +1,19 @@
 package ru.maklas.mrudp;
 
-import ru.maklas.utils.AtomicQueue;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.ConcurrentModificationException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static ru.maklas.mrudp.MRUDPUtils.*;
 
+/**
+ * Default implementation of MRUDPSocket
+ */
 public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private static volatile int threadCounter;
@@ -92,6 +94,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     public ConnectionResponse connect(int timeout, InetAddress address, int port, final byte[] data) {
         if (address == null || port < 0) {
             throw new NullPointerException();
+        }
+        if (createdByServer){
+            throw new RuntimeException("Can't change connection of socket that was created by server");
         }
 
         SocketState stateAtTheBeginning = state.get();
@@ -390,7 +395,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     @Override
     public boolean receive(SocketProcessor processor) {
         if (processing){
-            throw new RuntimeException("Can't be processed by 2 threads at the same time");
+            throw new ConcurrentModificationException("Can't be processed by 2 threads at the same time");
         }
         processing = true;
         interrupted = false;
@@ -444,7 +449,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void triggerPingListeners(float ping) {
         MRUDPListener[] listeners = this.listeners;
         for (MRUDPListener listener : listeners) {
-            listener.onPingUpdated(ping);
+            listener.onPingUpdated(this, ping);
         }
 
     }
@@ -818,8 +823,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public void setUserData(Object userData) {
+    public Object setUserData(Object userData) {
+        Object oldUserData = this.userData;
         this.userData = userData;
+        return oldUserData;
     }
 
     @Override
@@ -832,7 +839,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return userData;
     }
 
-    /* UTILS */
+    @Override
+    public boolean isClosed() {
+        return socket.isClosed();
+    }
+
+/* UTILS */
 
     private void log(String msg){
         //-- System.err.println(msg);

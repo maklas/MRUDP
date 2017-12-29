@@ -194,12 +194,12 @@ public class TestsSocket {
 
         client.addListener(new MRUDPListener() {
             @Override
-            public void onDisconnect(MRUDPSocket fixedBufferMRUDP2) {
+            public void onDisconnect(MRUDPSocket socket) {
                 System.out.println("client dc");
             }
 
             @Override
-            public void onPingUpdated(float newPing) {
+            public void onPingUpdated(MRUDPSocket socket, float newPing) {
 
             }
         });
