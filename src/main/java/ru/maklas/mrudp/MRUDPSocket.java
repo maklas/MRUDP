@@ -90,9 +90,14 @@ public interface MRUDPSocket {
      */
     boolean receive(SocketProcessor processor);
 
-    void addListener(MRUDPListener listener);
+    void addDCListener(MDisconnectionListener listener);
 
-    void removeListeners(MRUDPListener listener);
+    void addPingListener(MPingListener listener);
+
+    void removeDCListener(MDisconnectionListener listener);
+
+    void removePingListener(MPingListener listener);
+
 
     /**
      * Sets how often ping should be updated in milliseconds. When ping updates, listeners will be notified

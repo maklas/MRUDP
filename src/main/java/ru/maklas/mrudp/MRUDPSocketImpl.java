@@ -38,7 +38,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private volatile boolean started = false;
     private boolean interrupted = false;
     private volatile boolean processing = false;
-    private MRUDPListener[] listeners = new MRUDPListener[0];
+    private volatile MDisconnectionListener[] dcListeners = new MDisconnectionListener[0];
+    private volatile MPingListener[] pingListeners = new MPingListener[0];
 
     private boolean createdByServer = false;
     private byte[] responseForConnect = new byte[]{0};
@@ -367,42 +368,23 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public void addListener(MRUDPListener listener) {
-        MRUDPListener[] listeners = this.listeners;
-        int length = listeners.length;
-
-        for (int i = 0; i < length; i++) {
-            if (listeners[i] == listener){
-                return;
-            }
-        }
-
-        MRUDPListener[] newListeners = new MRUDPListener[length + 1];
-        System.arraycopy(listeners, 0, newListeners, 0, length);
-        newListeners[length] = listener;
-        this.listeners = newListeners;
+    public void addDCListener(MDisconnectionListener listener) {
+        this.dcListeners = addObject(this.dcListeners, listener);
     }
 
     @Override
-    public void removeListeners(MRUDPListener listener) {
-        MRUDPListener[] listeners = this.listeners;
-        int length = listeners.length;
+    public void addPingListener(MPingListener listener) {
+        this.pingListeners = addObject(this.pingListeners, listener);
+    }
 
-        for (int i = 0; i < length; i++) {
-            if (listeners[i] == listener){
+    @Override
+    public void removeDCListener(MDisconnectionListener listener) {
+        this.dcListeners = removeObject(this.dcListeners, listener);
+    }
 
-                MRUDPListener[] newListeners = new MRUDPListener[length-1];
-
-                int aliveCounter = 0;
-                for (int j = 0; j < length; j++) {
-                    if (listeners[i] != listener){
-                        newListeners[aliveCounter++] = listeners[i];
-                    }
-                }
-                this.listeners = newListeners;
-                return;
-            }
-        }
+    @Override
+    public void removePingListener(MPingListener listener) {
+        this.pingListeners = removeObject(this.pingListeners, listener);
     }
 
     /**
@@ -456,15 +438,15 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void triggerDCListeners(){
-        MRUDPListener[] listeners = this.listeners;
-        for (MRUDPListener listener : listeners) {
+        MDisconnectionListener[] listeners = this.dcListeners;
+        for (MDisconnectionListener listener : listeners) {
             listener.onDisconnect(this);
         }
     }
 
     private void triggerPingListeners(float ping) {
-        MRUDPListener[] listeners = this.listeners;
-        for (MRUDPListener listener : listeners) {
+        MPingListener[] listeners = this.pingListeners;
+        for (MPingListener listener : listeners) {
             listener.onPingUpdated(this, ping);
         }
 
@@ -727,6 +709,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
+    private void interruptReceivingThread(){
+        if (receivingThread != null){
+            receivingThread.interrupt();
+        }
+    }
+
     private void interruptReceivingThreadAndJoin(int wait){
         if (updateThread != null){
             try {
@@ -736,18 +724,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    private void interruptReceivingThread(){
-        if (receivingThread != null){
-            receivingThread.interrupt();
-        }
-    }
-
     private boolean disconnectByClient(){
-        if (isConnected()){
+        if (state.get() != SocketState.NOT_CONNECTED){
             sendData(buildDisconnect());
             state.set(SocketState.NOT_CONNECTED);
-            flushBuffers();
             triggerDCListeners();
+            flushBuffers();
             return true;
         }
         return false;
@@ -756,29 +738,30 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void closeByClient(){
         interruptUpdateThread();
         interruptReceivingThread();
-        disconnectByClient();
-        state.set(SocketState.NOT_CONNECTED);
-        flushBuffers();
+        if (state.get() != SocketState.NOT_CONNECTED) {
+            sendData(buildDisconnect());
+            state.set(SocketState.NOT_CONNECTED);
+            triggerDCListeners();
+        }
         socket.close();
+        flushBuffers();
     }
 
     private void receivedDCByClientOrTimeOut(){
-        if (isConnected()) {
-            sendData(buildDisconnect());
-            state.set(SocketState.NOT_CONNECTED);
-            flushBuffers();
-            triggerDCListeners();
-        }
+        sendData(buildDisconnect());
+        state.set(SocketState.NOT_CONNECTED);
+        triggerDCListeners();
+        flushBuffers();
     }
 
 
     private boolean dcOrCloseByServer(){
-        if (isConnected()){
+        if (state.get() != SocketState.NOT_CONNECTED){
             sendData(buildDisconnect());
             state.set(SocketState.NOT_CONNECTED);
-            flushBuffers();
             interruptUpdateThread();
             triggerDCListeners();
+            flushBuffers();
             return true;
         }
         return false;
@@ -787,7 +770,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void receivedDCByServerOrTimeOut(){
         if (isConnected()) {
             state.set(SocketState.NOT_CONNECTED);
-            flushBuffers();
             interruptUpdateThread();
             flushBuffers();
             triggerDCListeners();
@@ -892,6 +874,39 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         MRUDPUtils.putInt(pingResponse, seq, 1);
         putLong(pingResponse, startTime, 5);
         return pingResponse;
+    }
+
+    private <T> T[] addObject(T[] array, T object) {
+        int length = array.length;
+
+        for (int i = 0; i < length; i++) {
+            if (array[i] == object){
+                return array;
+            }
+        }
+        T[] newArray = (T[]) new Object[length + 1];
+        System.arraycopy(array, 0, newArray, 0, length);
+        newArray[length] = object;
+        return newArray;
+    }
+
+    private <T> T[] removeObject(T[] array, T object){
+        int length = array.length;
+
+        for (int i = 0; i < length; i++) {
+            if (array[i] == object){
+                T[] newArray = (T[]) new Object[length-1];
+
+                int aliveCounter = 0;
+                for (int j = 0; j < length; j++) {
+                    if (array[i] != object){
+                        newArray[aliveCounter++] = array[i];
+                    }
+                }
+                return newArray;
+            }
+        }
+        return array;
     }
 
 }
