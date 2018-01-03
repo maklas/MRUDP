@@ -192,15 +192,10 @@ public class TestsSocket {
         MRUDPSocketImpl client = new MRUDPSocketImpl(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 7000);
         client.start(75);
 
-        client.addListener(new MRUDPListener() {
+        client.addDCListener(new MDisconnectionListener() {
             @Override
             public void onDisconnect(MRUDPSocket socket) {
                 System.out.println("client dc");
-            }
-
-            @Override
-            public void onPingUpdated(MRUDPSocket socket, float newPing) {
-
             }
         });
 

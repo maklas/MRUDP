@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -770,6 +771,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private void receivedDCByServerOrTimeOut(){
         if (isConnected()) {
             state.set(SocketState.NOT_CONNECTED);
+            flushBuffers();
             interruptUpdateThread();
             flushBuffers();
             triggerDCListeners();
@@ -884,7 +886,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 return array;
             }
         }
-        T[] newArray = (T[]) new Object[length + 1];
+        T[] newArray = Arrays.copyOf(array, length + 1);
         System.arraycopy(array, 0, newArray, 0, length);
         newArray[length] = object;
         return newArray;
@@ -895,7 +897,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         for (int i = 0; i < length; i++) {
             if (array[i] == object){
-                T[] newArray = (T[]) new Object[length-1];
+                T[] newArray =  Arrays.copyOf(array, length - 1);
 
                 int aliveCounter = 0;
                 for (int j = 0; j < length; j++) {
