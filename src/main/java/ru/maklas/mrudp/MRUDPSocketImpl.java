@@ -117,6 +117,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             throw new RuntimeException("Can't change connection of socket that was created by server");
         }
 
+        flushBuffers();
+
         SocketState stateAtTheBeginning = state.get();
         if (stateAtTheBeginning != SocketState.NOT_CONNECTED){
             return new ConnectionResponse(ConnectionResponse.Type.ALREADY_CONNECTED_OR_CONNECTING, zeroLengthByte);
