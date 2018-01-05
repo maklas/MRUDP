@@ -49,12 +49,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private final int dcTimeDueToInactivity;
     private volatile long lastCommunicationTime;
+    private boolean dcOnInactivity = true;
 
     private static final int defaultPingCD = 4000;
     private volatile int pingCD = defaultPingCD;
     private long lastPingSendTime;
     private volatile float currentPing = 0;
     private Object userData = null;
+
 
     private Thread updateThread;
     private Thread receivingThread;
@@ -311,7 +313,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                         break;
                     }
                     final long currTime = System.currentTimeMillis();
-                    if (currTime - lastCommunicationTime > dcTimeDueToInactivity){
+                    if (dcOnInactivity && currTime - lastCommunicationTime > dcTimeDueToInactivity){
                         receiveQueue.put(zeroLengthByte);
                         break;
                     }
@@ -829,6 +831,21 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         Object oldUserData = this.userData;
         this.userData = userData;
         return oldUserData;
+    }
+
+    @Override
+    public void pauseDCcheck() {
+        dcOnInactivity = false;
+    }
+
+    @Override
+    public boolean dcCheckIsPaused() {
+        return dcOnInactivity;
+    }
+
+    @Override
+    public void resumeDCcheck() {
+        dcOnInactivity = true;
     }
 
     @Override

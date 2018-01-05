@@ -98,6 +98,20 @@ public interface MRUDPSocket {
 
     void removePingListener(MPingListener listener);
 
+    /**
+     * When socket's dc check is paused, socket can't be disconnected due to no response. Use {@link #resumeDCcheck()} to re-enable this function
+     */
+    void pauseDCcheck();
+
+    /**
+     * When socket's dc check is paused, socket can't be disconnected due to no response
+     */
+    boolean dcCheckIsPaused();
+
+    /**
+     * When socket's dc check is paused, socket can't be disconnected due to no response
+     */
+    void resumeDCcheck();
 
     /**
      * Sets how often ping should be updated in milliseconds. When ping updates, listeners will be notified
