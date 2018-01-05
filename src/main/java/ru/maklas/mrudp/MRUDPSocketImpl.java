@@ -845,6 +845,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public void resumeDCcheck() {
+        lastCommunicationTime = System.currentTimeMillis();
         dcOnInactivity = true;
     }
 
