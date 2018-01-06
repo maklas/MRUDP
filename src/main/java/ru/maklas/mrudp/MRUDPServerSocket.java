@@ -233,6 +233,11 @@ public class MRUDPServerSocket {
      * Disconnects and closes all sockets created by server
      */
     public void close(){
+        Iterable<MRUDPSocketImpl> values = connectionMap.values();
+        for (MRUDPSocketImpl value : values) {
+            value.serverStopped();
+        }
+
         if (receivingThread != null){
             receivingThread.interrupt();
         }
