@@ -98,6 +98,8 @@ public interface MRUDPSocket {
 
     void removePingListener(MPingListener listener);
 
+    void removeAllListeners();
+
     /**
      * When socket's dc check is paused, socket can't be disconnected due to no response. Use {@link #resumeDCcheck()} to re-enable this function
      */

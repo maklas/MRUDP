@@ -392,6 +392,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         this.pingListeners = removeObject(this.pingListeners, listener);
     }
 
+    @Override
+    public void removeAllListeners() {
+        this.pingListeners = new MPingListener[0];
+        this.dcListeners = new MDisconnectionListener[0];
+    }
+
     /**
      * @return True if got interrupted in the middle of the process
      */
