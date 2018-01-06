@@ -227,6 +227,16 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
+    @Override
+    public boolean sendUnreliableOff5(byte[] data) {
+        if (isConnected()) {
+            byte[] fullPackage = appendUnreliableRequest(data);
+            sendData(fullPackage);
+            return true;
+        }
+        return false;
+    }
+
     public void start(final int updateThreadSleepTimeMS){
         if (started){
             System.err.println("Double start registered");

@@ -52,7 +52,8 @@ public interface MRUDPSocket {
      * This method is used to avoid unnecessary byte[] allocation and copying.
      * </p>
      *
-     * @param dataWithOffset5 Data to be send with offset 5. Meaning that first 5 bytes must not contain data. They are going to be overwritten. After sending this byte array must not be changed.
+     * @param dataWithOffset5 Data to be send with offset 5. Meaning that first 5 bytes must not contain data.
+     *                        They are going to be overwritten. After sending this byte array must not be changed.
      * @return <b>False</b> if socket is not connected
      */
     boolean sendOff5(byte[] dataWithOffset5);
@@ -66,6 +67,23 @@ public interface MRUDPSocket {
      * @return <b>False</b> if socket is not connected.
      */
     boolean sendUnreliable(byte[] data);
+
+    /**
+     * <p>Sends data to connected socket if current state == CONNECTED</p>
+     * <p>This method sends data as fast as possible to a socket on the other end and <b>does not provide reliability nor ordering</b>.
+     * this method uses plain UDP, so packet might not be delivered, or delivered not in the order of sending.
+     * </p>
+     *
+     * <p>Difference between {@link #sendUnreliable(byte[])} is that the first 5 bytes are going to be overwritten
+     * and that this data won't be copied, so <b>please do not change byte[] after sending!</b>
+     * This method is used to avoid unnecessary byte[] allocation and copying.
+     * </p>
+     *
+     * @param data Data to be send with offset 5. Meaning that first 5 bytes must not contain data.
+     *             They are going to be overwritten. After sending this byte array must not be changed.
+     * @return <b>False</b> if socket is not connected.
+     */
+    boolean sendUnreliableOff5(byte[] data);
 
     /**
      * Starts update thread (and receiving thread in case this socket wasn't created by a Server).

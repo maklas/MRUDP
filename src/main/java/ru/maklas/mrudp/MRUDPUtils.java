@@ -25,6 +25,10 @@ class MRUDPUtils {
         dataWith5Offset[0] = reliableRequest;
         putInt(dataWith5Offset, seq, 1);
     }
+    static byte[] appendUnreliableRequest(byte[] dataWith5Offset){
+        dataWith5Offset[0] = unreliableRequest;
+        return dataWith5Offset;
+    }
 
     static byte[] buildReliableResponse (int seq){
         return build5byte(reliableResponse, seq);
