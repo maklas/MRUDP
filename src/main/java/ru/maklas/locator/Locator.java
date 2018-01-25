@@ -9,12 +9,14 @@ import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static ru.maklas.locator.LocatorUtils.createRequest;
 
 public class Locator {
+    private static int locatorCounter = 0;
 
     private final ExecutorService executor;
     private final DatagramPacket sendingPacket;
@@ -30,11 +32,29 @@ public class Locator {
     private volatile Thread sleepingThread;
     private final Object sleepingMonitor = new Object();
 
+    /**
+     * Creates a new Locator instance which is able to send request
+     * to the specified broadcast address and receive responses.
+     * @param uuid Unique id for application. So that no other apps that use this library could see your request.
+     *             {@link BroadcastServlet} must have the same UUID in oder to receive requests!
+     * @param address Broadcast address. Use 255.255.255.255 if you can't know for sure subnet broadcast address.
+     *                But that's not recommended since routers can sometimes block udp packets on 255.255.255.255
+     * @param port A port {@link BroadcastServlet} must listen on to receive your request.
+     * @param bufferSize max size of requests and responses. Make sure It's above any byte[] you're trying to send
+     * @throws Exception if address can't be parsed.
+     */
     public Locator(byte[] uuid, String address, int port, int bufferSize) throws Exception{
         this.uuid = Arrays.copyOf(uuid, 16);
         this.address = InetAddress.getByName(address);
         this.port = port;
-        executor = Executors.newFixedThreadPool(2);
+        executor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "Locator #" + locatorCounter++);
+                t.setDaemon(true);
+                return t;
+            }
+        });
         sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         receivingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
         socket = new DatagramSocket();
@@ -43,6 +63,18 @@ public class Locator {
         executor.submit(receiver);
     }
 
+    /**
+     * Starts discovery for specified amount of time. Only 1 discovery can be done at a time
+     * @param discoveryTimeMS How many millisecond discovery will last.
+     *                        This method will <b>blocks calling thread for this time until discovery is finished!</b>
+     * @param resends How many re-sends should be done during discovery. Please note that UDP is unreliable protocol
+     *                and it states that packet can be lost during data transmission. setting this value to 1 won't be
+     *                a safe choice. 3-5 is usually enough. Also, don't make this value too high, flooding the router.
+     * @param requestData Your request data
+     * @param responseNotifier Response listener. It will be active until discovery ends, receiving responses.
+     *                         Triggered by Thread that started the discovery
+     * @return False if discovey can't start. Usual reason is that discovery is already in process.
+     */
     public boolean startDiscovery(final int discoveryTimeMS, final int resends, final byte[] requestData, Notifier<LocatorResponse> responseNotifier) {
 
         boolean succeeded = discovering.compareAndSet(false, true);
@@ -85,11 +117,16 @@ public class Locator {
 
     }
 
-
+    /**
+     * @return Whether this Locator is discovering right now.
+     */
     public boolean isDiscovering(){
         return discovering.get();
     }
 
+    /**
+     * Interrupts current discovery. When this method is finished, doesn't guarantee that {@link #startDiscovery(int, int, byte[], Notifier)} returns.
+     */
     public void interruptDiscovering(){
         synchronized (sleepingMonitor){
             Thread sleepingThread = this.sleepingThread;
@@ -110,8 +147,10 @@ public class Locator {
         } catch (IOException e) {}
     }
 
-
-    public void dispose(){
+    /**
+     * Closes UDP socket and inner threads
+     */
+    public void close(){
         socket.close();
         executor.shutdown();
     }

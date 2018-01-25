@@ -22,6 +22,16 @@ public class BroadcastServlet {
     private final Object memoryMonitor = new Object();
 
 
+    /**
+     * Creates a new BroadcastServlet instance which is able to send responses to Locator in LAN.
+     * Creates new UDP-listening thread
+     * @param port Port which Servlet is listening. Must be the same for Locator.
+     * @param bufferSize Max size of requests and responses. Make sure It's above any byte[] you're trying to send
+     * @param uuid  Unique id for application. So that no other apps that use this library could see your request.
+     *             {@link Locator} must have the same UUID in oder to receive requests!
+     * @param processor Processor that will process Locators requests and respond to them.
+     * @throws Exception if address can't be parsed.
+     */
     public BroadcastServlet(int port, int bufferSize, byte[] uuid, BroadcastProcessor processor) throws Exception{
         socket = new DatagramSocket(port, InetAddress.getByName("0.0.0.0"));
         sendingPacket = new DatagramPacket(new byte[bufferSize], bufferSize);
@@ -37,6 +47,9 @@ public class BroadcastServlet {
         thread.start();
     }
 
+    /**
+     * Servlet must be enabled in order to function and trigger {@link BroadcastProcessor}.
+     */
     public void enable(){
         enabled = true;
     }
@@ -48,14 +61,23 @@ public class BroadcastServlet {
         enabled = false;
     }
 
+    /**
+     * Servlet must be enabled in order to function and trigger {@link BroadcastProcessor}.
+     */
     public boolean isEnabled(){
         return enabled;
     }
 
+    /**
+     * Closes UDP socket and related Thread
+     */
     public void close(){
         socket.close();
     }
 
+    public boolean isClosed(){
+        return socket.isClosed();
+    }
 
 
     private void run(){
@@ -121,7 +143,6 @@ public class BroadcastServlet {
             socket.send(sendingPacket);
         } catch (IOException e) {}
     }
-
 
     private class Pack{
         private final InetAddress address;

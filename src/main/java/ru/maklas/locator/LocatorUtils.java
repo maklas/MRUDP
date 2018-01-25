@@ -1,6 +1,6 @@
 package ru.maklas.locator;
 
-public class LocatorUtils {
+class LocatorUtils {
 
 
     static final int minMsgLength = 21;

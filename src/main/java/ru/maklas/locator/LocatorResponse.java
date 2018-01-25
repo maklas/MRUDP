@@ -1,6 +1,7 @@
 package ru.maklas.locator;
 
 import java.net.InetAddress;
+import java.util.Arrays;
 
 public class LocatorResponse {
 
@@ -8,7 +9,7 @@ public class LocatorResponse {
     private final int port;
     private final byte[] response;
 
-    public LocatorResponse(InetAddress address, int port, byte[] response) {
+    LocatorResponse(InetAddress address, int port, byte[] response) {
         this.address = address;
         this.port = port;
         this.response = response;
@@ -24,5 +25,14 @@ public class LocatorResponse {
 
     public byte[] getResponse() {
         return response;
+    }
+
+
+    @Override
+    public String toString() {
+        return "LocatorResponse{" +
+                "address=" + address.getHostAddress() + ':' + port +
+                ", response=" + Arrays.toString(response) +
+                '}';
     }
 }
