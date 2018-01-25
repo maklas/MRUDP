@@ -140,6 +140,11 @@ public class TestsSocket {
             public void notify(LocatorResponse locatorResponse) {
                 System.out.println("new response! " + locatorResponse.getAddress().getHostAddress() + ":" + locatorResponse.getPort() + " -- " + new String(locatorResponse.getResponse()));
             }
+
+            @Override
+            public void finish() {
+
+            }
         });
         System.out.println(SimpleProfiler.getTimeAsString(2));
 

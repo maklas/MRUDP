@@ -4,4 +4,6 @@ public interface Notifier<T> {
 
     void notify(T t);
 
+    void finish();
+
 }

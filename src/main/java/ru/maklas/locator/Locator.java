@@ -113,6 +113,7 @@ public class Locator {
         } catch (InterruptedException e) {}
         receiver.stop();
         discovering.set(false);
+        responseNotifier.finish();
         return true;
 
     }
@@ -153,6 +154,10 @@ public class Locator {
     public void close(){
         socket.close();
         executor.shutdown();
+    }
+
+    public boolean isClosed(){
+        return socket.isClosed();
     }
 
     private static class Receiver implements Runnable{
