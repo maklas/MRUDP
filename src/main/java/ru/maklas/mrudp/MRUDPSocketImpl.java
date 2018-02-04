@@ -324,7 +324,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     }
                     final long currTime = System.currentTimeMillis();
                     if (dcOnInactivity && currTime - lastCommunicationTime > dcTimeDueToInactivity){
-                        receiveQueue.put(zeroLengthByte);
+                        receiveQueue.put(CONNECTION_TIME_OUT);
                         break;
                     }
 

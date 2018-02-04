@@ -12,9 +12,10 @@ public interface MRUDPSocket {
      */
     enum SocketState {NOT_CONNECTED, CONNECTING, CONNECTED}
 
-    String DEFAULT_DC_MSG = "Disconnect";
-    String DEFAULT_CLOSE_MSG = "Close";
-    String SERVER_CLOSE_MSG = "Server Close";
+    String DEFAULT_DC_MSG = "DISCONNECT";
+    String DEFAULT_CLOSE_MSG = "CLOSE";
+    String SERVER_CLOSE_MSG = "SERVER_CLOSE";
+    String CONNECTION_TIME_OUT = "CONNECTION TIME OUT";
 
     // ACTIONS
 
