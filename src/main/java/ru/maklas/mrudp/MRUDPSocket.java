@@ -12,6 +12,10 @@ public interface MRUDPSocket {
      */
     enum SocketState {NOT_CONNECTED, CONNECTING, CONNECTED}
 
+    String DEFAULT_DC_MSG = "Disconnect";
+    String DEFAULT_CLOSE_MSG = "Close";
+    String SERVER_CLOSE_MSG = "Server Close";
+
     // ACTIONS
 
     /**
@@ -165,10 +169,25 @@ public interface MRUDPSocket {
     boolean disconnect();
 
     /**
+     * <p>Sends disconnection event to the socket on the other end, changes state do 'NOT_CONNECTED' and triggers listeners</p>
+     * <p><b>Important:</b> Socket can be used again to connect to server (unless this socket was created by server).
+     * Doesn't close UDP socket. Use {@link #close() close} method if you want to dispose of this socket and/or close UDP port
+     * </p>
+     * @return <b>True</b> if socket was connected before calling this method and that this method performed all of the described actions.
+     */
+    boolean disconnect(String msg);
+
+    /**
      * Performs disconnect if at that time socket was connected, stops any internal threads associated with this socket and then closes the UDPSocket. After this method,
      * socket becomes unusable and you have to create new instance to establish connection.
      */
     void close();
+
+    /**
+     * Performs disconnect if at that time socket was connected, stops any internal threads associated with this socket and then closes the UDPSocket. After this method,
+     * socket becomes unusable and you have to create new instance to establish connection.
+     */
+    void close(String msg);
 
     // GETTERS
 

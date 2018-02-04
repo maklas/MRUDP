@@ -33,7 +33,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final Object requestSendingMonitor = new Object();
     private final int bufferSize;
 
-    private final AtomicQueue<byte[]> receiveQueue = new AtomicQueue<byte[]>(10000);
+    private final AtomicQueue<Object> receiveQueue = new AtomicQueue<Object>(10000);
     private volatile int lastInsertedSeq = 0;
 
     private volatile boolean started = false;
@@ -354,20 +354,30 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean disconnect() {
+    public boolean disconnect(String msg) {
         if (createdByServer){
-            return dcOrCloseByServer();
+            return dcOrCloseByServer(msg);
         } else {
-            return disconnectByClient();
+            return disconnectByClient(msg);
         }
     }
 
     @Override
+    public boolean disconnect() {
+        return disconnect(DEFAULT_DC_MSG);
+    }
+
+    @Override
     public void close() {
+        close(DEFAULT_CLOSE_MSG);
+    }
+
+    @Override
+    public void close(String msg) {
         if (createdByServer){
-            dcOrCloseByServer();
+            dcOrCloseByServer(msg);
         } else {
-            closeByClient();
+            closeByClient(msg);
         }
     }
 
@@ -420,17 +430,18 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         interrupted = false;
         try {
 
-            byte[] poll = receiveQueue.poll();
+            Object poll = receiveQueue.poll();
             while (poll != null){
-                if (poll.length == 0){
+                if (poll instanceof byte[]){
+                    processor.process((byte[]) poll, this, this);
+                } else if (poll instanceof String){
                     if (createdByServer){
-                        receivedDCByServerOrTimeOut();
+                        receivedDCByServerOrTimeOut((String) poll);
                     } else {
-                        receivedDCByClientOrTimeOut();
+                        receivedDCByClientOrTimeOut((String) poll);
                     }
                     break;
                 }
-                processor.process(poll, this, this);
                 if (interrupted){
                     break;
                 }
@@ -458,10 +469,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         pingCD = newPingCD;
     }
 
-    private void triggerDCListeners(){
+    private void triggerDCListeners(String msg){
         MDisconnectionListener[] listeners = this.dcListeners;
         for (MDisconnectionListener listener : listeners) {
-            listener.onDisconnect(this);
+            listener.onDisconnect(this, msg);
         }
     }
 
@@ -584,7 +595,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 //ignore I guess
                 break;
             case disconnect:
-                receiveQueue.put(zeroLengthByte);
+                int dataLength = packageLength - 5;
+                if (dataLength == 0){
+                    receiveQueue.put(DEFAULT_DC_MSG);
+                } else {
+                    receiveQueue.put(new String(fullPackage, 5, dataLength));
+                }
                 break;
             case connectionAcknowledgment:
                 //Ignore I guess
@@ -631,7 +647,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
 
             case disconnect:
-                receiveQueue.put(zeroLengthByte);
+                int dataLength = packageLength - 5;
+                if (dataLength == 0){
+                    receiveQueue.put(DEFAULT_DC_MSG);
+                } else {
+                    receiveQueue.put(new String(fullPackage, 5, dataLength));
+                }
                 break;
 
             default:
@@ -745,64 +766,64 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    private boolean disconnectByClient(){
+    private boolean disconnectByClient(String msg){
         if (state.get() != SocketState.NOT_CONNECTED){
-            sendData(buildDisconnect());
+            sendData(buildDisconnect(msg));
             state.set(SocketState.NOT_CONNECTED);
-            triggerDCListeners();
+            triggerDCListeners(msg);
             flushBuffers();
             return true;
         }
         return false;
     }
 
-    private void closeByClient(){
+    private void closeByClient(String msg){
         interruptUpdateThread();
         interruptReceivingThread();
         if (state.get() != SocketState.NOT_CONNECTED) {
-            sendData(buildDisconnect());
+            sendData(buildDisconnect(msg));
             state.set(SocketState.NOT_CONNECTED);
-            triggerDCListeners();
+            triggerDCListeners(msg);
         }
         socket.close();
         flushBuffers();
     }
 
-    private void receivedDCByClientOrTimeOut(){
-        sendData(buildDisconnect());
+    private void receivedDCByClientOrTimeOut(String msg){
+        sendData(buildDisconnect(msg));
         state.set(SocketState.NOT_CONNECTED);
-        triggerDCListeners();
+        triggerDCListeners(msg);
         flushBuffers();
     }
 
-    private boolean dcOrCloseByServer(){
+    private boolean dcOrCloseByServer(String msg){
         if (state.get() != SocketState.NOT_CONNECTED){
-            sendData(buildDisconnect());
+            sendData(buildDisconnect(msg));
             state.set(SocketState.NOT_CONNECTED);
             interruptUpdateThread();
-            triggerDCListeners();
+            triggerDCListeners(msg);
             flushBuffers();
             return true;
         }
         return false;
     }
 
-    private void receivedDCByServerOrTimeOut(){
+    private void receivedDCByServerOrTimeOut(String msg){
         if (isConnected()) {
             state.set(SocketState.NOT_CONNECTED);
             flushBuffers();
             interruptUpdateThread();
             flushBuffers();
-            triggerDCListeners();
+            triggerDCListeners(msg);
         }
     }
 
-    void serverStopped(){
-        sendData(buildDisconnect());
+    void serverStopped(String msg){
+        sendData(buildDisconnect(msg));
         state.set(SocketState.NOT_CONNECTED);
         interruptUpdateThread();
         flushBuffers();
-        triggerDCListeners();
+        triggerDCListeners(msg);
     }
 
 

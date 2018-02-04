@@ -14,7 +14,6 @@ class MRUDPUtils {
     static final byte connectionAcknowledgmentResponse = 10;
     static final byte disconnect = 11;
 
-
     private static final byte[] dcPacket = new byte[]{disconnect, 0, 0, 0, 0};
 
     static byte[] buildReliableRequest (int seq, byte [] data){
@@ -75,8 +74,8 @@ class MRUDPUtils {
         return build5byte(connectionAcknowledgmentResponse, seq);
     }
 
-    static byte[] buildDisconnect (){
-        return dcPacket;
+    static byte[] buildDisconnect (String msg){
+        return build5byte(disconnect, 0, msg.getBytes());
     }
 
     static byte[] build5byte(byte settings, int seq, byte [] data){

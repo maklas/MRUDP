@@ -1,9 +1,7 @@
 package ru.maklas.mrudp;
 
 import org.junit.Test;
-import org.junit.runners.JUnit4;
 import ru.maklas.locator.*;
-import ru.maklas.mrudp.*;
 
 import java.net.InetAddress;
 import java.util.Arrays;
@@ -27,6 +25,13 @@ public class TestsSocket {
             public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage, byte[] userData) {
                 System.out.println("Registering new connection");
                 socket.start(50);
+                socket.addDCListener(new MDisconnectionListener() {
+                    @Override
+                    public void onDisconnect(MRUDPSocket socket, String msg) {
+                        System.out.println("Server-Sub dced: " + msg);
+                    }
+                });
+
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -62,7 +67,7 @@ public class TestsSocket {
             }
 
             @Override
-            public void onSocketDisconnected(MRUDPSocketImpl socket) {
+            public void onSocketDisconnected(MRUDPSocketImpl socket, String msg) {
 
             }
         });
@@ -105,7 +110,12 @@ public class TestsSocket {
         }
 
 
+
         Thread.sleep(2000);
+
+        client.disconnect();
+
+        Thread.sleep(10000);
     }
 
 
@@ -187,7 +197,7 @@ public class TestsSocket {
             }
 
             @Override
-            public void onSocketDisconnected(MRUDPSocketImpl socket) {
+            public void onSocketDisconnected(MRUDPSocketImpl socket, String msg) {
                 System.out.println("Server dc");
             }
         }, 7000);
@@ -199,7 +209,7 @@ public class TestsSocket {
 
         client.addDCListener(new MDisconnectionListener() {
             @Override
-            public void onDisconnect(MRUDPSocket socket) {
+            public void onDisconnect(MRUDPSocket socket, String msg) {
                 System.out.println("client dc");
             }
         });

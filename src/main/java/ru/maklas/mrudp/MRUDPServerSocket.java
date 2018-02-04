@@ -109,9 +109,9 @@ public class MRUDPServerSocket {
                                     final byte[] clientRequest = (byte[]) tripple[2];
                                     mrudp.addDCListener(new MDisconnectionListener() {
                                         @Override
-                                        public void onDisconnect(MRUDPSocket mrudpSocket) {
+                                        public void onDisconnect(MRUDPSocket mrudpSocket, String msg) {
                                             connectionMap.remove(mrudp.getRemoteAddress(), mrudp.getRemotePort());
-                                            model.onSocketDisconnected(mrudp);
+                                            model.onSocketDisconnected(mrudp, msg);
                                         }
                                     });
                                     connectionMap.put(remoteAddress, remotePort, mrudp);
@@ -158,7 +158,7 @@ public class MRUDPServerSocket {
 
                 Iterable<MRUDPSocketImpl> values = connectionMap.values();
                 for (MRUDPSocketImpl value : values) {
-                    value.serverStopped();
+                    value.serverStopped(MRUDPSocket.SERVER_CLOSE_MSG);
                 }
 
             }
@@ -235,7 +235,7 @@ public class MRUDPServerSocket {
     public void close(){
         Iterable<MRUDPSocketImpl> values = connectionMap.values();
         for (MRUDPSocketImpl value : values) {
-            value.serverStopped();
+            value.serverStopped(MRUDPSocket.SERVER_CLOSE_MSG);
         }
 
         if (receivingThread != null){

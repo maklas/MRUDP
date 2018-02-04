@@ -29,6 +29,6 @@ public interface ServerModel {
     /**
      * When socket was disconnected and deleted from Serverlist.
      */
-    void onSocketDisconnected(MRUDPSocketImpl socket);
+    void onSocketDisconnected(MRUDPSocketImpl socket, String msg);
 
 }
