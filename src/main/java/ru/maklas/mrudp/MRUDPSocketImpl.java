@@ -775,7 +775,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         flushBuffers();
     }
 
-
     private boolean dcOrCloseByServer(){
         if (state.get() != SocketState.NOT_CONNECTED){
             sendData(buildDisconnect());
@@ -877,6 +876,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public boolean isClosed() {
+        if (createdByServer){
+            if (updateThread == null){
+                return false;
+            }
+            return !updateThread.isAlive();
+        }
         return socket.isClosed();
     }
 

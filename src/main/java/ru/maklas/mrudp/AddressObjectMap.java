@@ -33,10 +33,6 @@ public class AddressObjectMap<T> {
     public Iterable<T> values() {
         return map.values();
     }
-    
-    public void putNew(InetAddress address, int port, T val){
-
-    }
 
     public void clear() {
         map.clear();
@@ -74,13 +70,6 @@ public class AddressObjectMap<T> {
                     copy.add(value);
                 }
                 return copy;
-            }
-        }
-
-        @Override
-        public void putNew(InetAddress address, int port, T val) {
-            synchronized (this){
-                super.putNew(address, port, val);
             }
         }
 
