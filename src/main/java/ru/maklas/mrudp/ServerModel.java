@@ -21,12 +21,6 @@ public interface ServerModel {
     void registerNewConnection(MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage, byte[] userData);
 
     /**
-     * Message that was receved by not connected socket, but protocol looks like MRUDP. You have to check though
-     * @param userData
-     */
-    void handleUnknownSourceMsg(byte[] userData);
-
-    /**
      * When socket was disconnected and deleted from Serverlist.
      */
     void onSocketDisconnected(MRUDPSocketImpl socket, String msg);

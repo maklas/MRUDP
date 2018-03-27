@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Package which is used to respond on ConnectionRequest.
  * @param <T> will be send with response
@@ -34,6 +36,7 @@ public class ConnectionResponsePackage<T> {
         return accept;
     }
 
+    @Nullable
     public T getResponseData() {
         return responseData;
     }

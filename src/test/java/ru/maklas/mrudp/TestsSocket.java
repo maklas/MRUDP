@@ -61,10 +61,6 @@ public class TestsSocket {
                     }
                 }).start();
             }
-            @Override
-            public void handleUnknownSourceMsg(byte[] userData) {
-
-            }
 
             @Override
             public void onSocketDisconnected(MRUDPSocketImpl socket, String msg) {
@@ -189,11 +185,6 @@ public class TestsSocket {
                         socket.send(sendingBytes);
                     }
                 })).start();
-            }
-
-            @Override
-            public void handleUnknownSourceMsg(byte[] userData) {
-
             }
 
             @Override
