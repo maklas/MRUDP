@@ -135,10 +135,6 @@ public class MRUDPServerSocket {
                                     if (tripple != null) {
                                         MRUDPSocketImpl mrudp = (MRUDPSocketImpl) tripple[1];
                                         mrudp.receiveConnected(remoteAddress, remotePort, receivingBuffer, dataLength);
-                                    } else {
-                                        byte[] userData = new byte[dataLength - 5];
-                                        System.arraycopy(receivingBuffer, 5, userData, 0, dataLength - 5);
-                                        model.handleUnknownSourceMsg(userData);
                                     }
                                 }
                                 break;
