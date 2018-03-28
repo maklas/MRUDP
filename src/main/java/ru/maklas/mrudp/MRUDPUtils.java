@@ -123,6 +123,9 @@ class MRUDPUtils {
         return ret;
     }
 
+    /**
+     * Assumes that batch data is correct. Otherwise will throw Runtime exceptions
+     */
     public static byte[][] breakBatchDown(byte[] batchPacket){
         int arrSize = batchPacket[5];
         byte[][] ret = new byte[arrSize][];

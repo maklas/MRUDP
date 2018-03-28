@@ -559,10 +559,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
                 if (expectedSeqBatch == seq){
                     this.lastInsertedSeq = seq;
-                    byte[][] batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
-                    for (byte[] batchPacket : batchPackets) {
-                        receiveQueue.put(batchPacket);
-                    }
+                    byte[][] batchPackets;
+                    try {
+                        batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+                        for (byte[] batchPacket : batchPackets) {
+                            receiveQueue.put(batchPacket);
+                        }
+                    } catch (Exception ignore) {}
                     checkForWaitingDatas();
                 } else if (expectedSeqBatch < seq){
                     insertIntoWaitingDatas(seq, MRUDPUtils.breakBatchDown(fullPackage));
