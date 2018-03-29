@@ -38,7 +38,7 @@ public class TestsSocket {
     public void testBatchInSocket() throws Exception {
         InetAddress localHost = InetAddress.getLocalHost();
         int port = 9090;
-        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new JavaUDPSocket(port), 70), 512, new ServerModel() {
+        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new HighPingUDPSocket(new JavaUDPSocket(port), 500) , 0), 512, new ServerModel() {
             @Override
             public ConnectionResponsePackage<byte[]> validateNewConnection(InetAddress address, int port, byte[] userData) {
                 System.out.println("Validating new connection");
@@ -100,6 +100,12 @@ public class TestsSocket {
 
         final MRUDPSocket client = new MRUDPSocketImpl(512);
         client.start(50);
+        client.addPingListener(new MPingListener() {
+            @Override
+            public void onPingUpdated(MRUDPSocket socket, float newPing) {
+                System.out.println("Ping: " + newPing);
+            }
+        });
         ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{0});
         System.out.println(connect.getType());
 
@@ -129,11 +135,11 @@ public class TestsSocket {
         }).start();
 
 
-        Thread.sleep(2000);
+        Thread.sleep(7000);
 
         client.disconnect();
 
-        Thread.sleep(10000);
+        Thread.sleep(1000);
     }
 
     @Test
