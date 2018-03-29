@@ -206,6 +206,18 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
+    @Override
+    public boolean sendBatch(MRUDPBatch batch) {
+        if (isConnected()) {
+            int seq = this.seq.getAndIncrement();
+            byte[] fullPackage = buildBatch(seq, batch);
+            saveRequest(seq, fullPackage);
+            sendData(fullPackage);
+            return true;
+        }
+        return false;
+    }
+
     public boolean sendOff5(byte[] dataWithOffset5){
         if (isConnected()) {
             int seq = this.seq.getAndIncrement();
@@ -540,6 +552,24 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     insertIntoWaitingDatas(seq, userData);
                 }
                 break;
+            case batch:
+                byte[] respBatch = getReliableResponseCACHED(seq);
+                sendResponseData(address, port, respBatch);
+                final int expectedSeqBatch = this.lastInsertedSeq + 1;
+
+                if (expectedSeqBatch == seq){
+                    this.lastInsertedSeq = seq;
+                    byte[][] batchPackets;
+                    try {
+                        batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+                        for (byte[] batchPacket : batchPackets) {
+                            receiveQueue.put(batchPacket);
+                        }
+                    } catch (Exception ignore) {}
+                    checkForWaitingDatas();
+                } else if (expectedSeqBatch < seq){
+                    insertIntoWaitingDatas(seq, MRUDPUtils.breakBatchDown(fullPackage));
+                }
             case reliableResponse:
                 if (packageLength != 5){
                     log("Unexpected response length: " + packageLength);
@@ -684,16 +714,24 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
         synchronized (waitings) {
             expectedSeq = lastInsertedSeq + 1;
-            byte[] mayBeFullData = waitings.remove(expectedSeq);
+            Object mayBeData = waitings.remove(expectedSeq);
 
-            while (mayBeFullData != null) {
-                if (mayBeFullData.length == 0) { // Если в очереди остался пинг
-                    this.lastInsertedSeq = expectedSeq;
+            while (mayBeData != null) {
+                if (mayBeData instanceof byte[]){
+                    if (((byte[]) mayBeData).length == 0) { // Если в очереди остался пинг
+                        this.lastInsertedSeq = expectedSeq;
+                    } else {
+                        insert(expectedSeq, (byte[]) mayBeData);
+                    }
                 } else {
-                    insert(expectedSeq, mayBeFullData);
+                    this.lastInsertedSeq = expectedSeq;
+                    byte[][] batch = (byte[][]) mayBeData;
+                    for (byte[] bytes : batch) {
+                        receiveQueue.put(bytes);
+                    }
                 }
                 expectedSeq = lastInsertedSeq + 1;
-                mayBeFullData = waitings.remove(expectedSeq);
+                mayBeData = waitings.remove(expectedSeq);
             }
         }
 
@@ -711,10 +749,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         receiveQueue.put(userData);
     }
 
-    private final SortedIntList<byte[]> waitings = new SortedIntList<byte[]>();
-    private void insertIntoWaitingDatas(int seq, byte[] fullPackage) {
+    /**
+     * Сортированные данные которые могут быть как byte[] - чистый пакет или byte[][] - batch пакет
+     */
+    private final SortedIntList<Object> waitings = new SortedIntList<Object>();
+    private void insertIntoWaitingDatas(int seq, Object userData) {
         synchronized (waitings) {
-            waitings.insert(seq, fullPackage);
+            waitings.insert(seq, userData);
         }
     }
 

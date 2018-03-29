@@ -1,5 +1,7 @@
 package ru.maklas.mrudp;
 
+import java.util.ArrayList;
+
 class MRUDPUtils {
     
     static final byte reliableRequest = 1;
@@ -13,6 +15,7 @@ class MRUDPUtils {
     static final byte connectionAcknowledgment = 9;
     static final byte connectionAcknowledgmentResponse = 10;
     static final byte disconnect = 11;
+    static final byte batch = 12;
 
     private static final byte[] dcPacket = new byte[]{disconnect, 0, 0, 0, 0};
 
@@ -94,6 +97,59 @@ class MRUDPUtils {
         return ret;
     }
 
+    public static byte[] buildBatch(int seq, MRUDPBatch batch) {
+        ArrayList<byte[]> array = batch.array;
+        //5 - seq + bath type;
+        //for each byte[] - size (2 bytes) + data;
+        //
+        int retSize = 6;
+        int batchSize = array.size();
+        for (int i = 0; i < batchSize; i++) {
+            retSize += array.get(i).length + 2;
+        }
+
+        byte[] ret = new byte[retSize];
+        ret[0] = MRUDPUtils.batch;
+        putInt(ret, seq, 1);
+        ret[5] = (byte) batchSize;
+        int position = 6;
+        for (int i = 0; i < batchSize; i++) {
+            byte[] src = array.get(i);
+            int srcLen = src.length;
+            putShort(ret, srcLen, position);
+            System.arraycopy(src, 0, ret, position + 2, srcLen);
+            position += srcLen + 2;
+        }
+        return ret;
+    }
+
+    /**
+     * Assumes that batch data is correct. Otherwise will throw Runtime exceptions
+     */
+    public static byte[][] breakBatchDown(byte[] batchPacket){
+        int arrSize = batchPacket[5];
+        byte[][] ret = new byte[arrSize][];
+        int pos = 6;
+        for (int i = 0; i < arrSize; i++) {
+            int packetSize = extractShort(batchPacket, pos);
+            ret[i] = new byte[packetSize];
+            System.arraycopy(batchPacket, pos + 2, ret[i], 0, packetSize);
+            pos += packetSize + 2;
+        }
+        return ret;
+    }
+
+    static void putShort(byte[] bytes, int value, int offset){
+        bytes[    offset] = (byte) (value >>> 8);
+        bytes[1 + offset] = (byte)  value;
+    }
+
+    static int extractShort(byte[] bytes, int offset){
+        return
+                bytes[offset] << 8             |
+                        (bytes[1 + offset] & 0xFF);
+    }
+
     static void putInt(byte[] bytes, int value, int offset) {
         bytes[    offset] = (byte) (value >>> 24);
         bytes[1 + offset] = (byte) (value >>> 16);
@@ -148,5 +204,4 @@ class MRUDPUtils {
             default                              : return "UNKNOWN TYPE(" + settingsBytes + ")";
         }
     }
-
 }
