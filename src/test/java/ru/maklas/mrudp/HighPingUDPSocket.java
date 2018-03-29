@@ -12,23 +12,22 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
     private final UDPSocket delegate;
     private final int sendingPing;
     private final int receivingPing;
-    private final ExecutorService service;
-    private final Object sendingMonitor;
-    private final DatagramPacket sendingPacket;
-
+    private final Sender sender;
+    private final LinkedBlockingQueue<DataTriplet> receiver = new LinkedBlockingQueue<DataTriplet>();
     private final DatagramPacket receivingPacket;
-    private final LinkedBlockingQueue<DataTriplet> dataQueue;
+    private final Thread sendT;
+    private final Thread recT;
+
 
     public HighPingUDPSocket(UDPSocket delegate, int minPingMS) {
         this.delegate = delegate;
         this.sendingPing = this.receivingPing = minPingMS/2;
-        service = Executors.newCachedThreadPool();
-        sendingMonitor = new Object();
-        sendingPacket = new DatagramPacket(new byte[0], 0);
         receivingPacket = new DatagramPacket(new byte[1500], 1500);
-        dataQueue = new LinkedBlockingQueue<DataTriplet>();
-        final Thread thread = new Thread(this);
-        thread.start();
+        recT = new Thread(this);
+        recT.start();
+        sender = new Sender();
+        sendT = new Thread(sender);
+        sendT.start();
     }
 
 
@@ -45,28 +44,13 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
         final int packetLength = packet.getData().length;
         final byte[] data = new byte[packetLength];
         System.arraycopy(packet.getData(), 0, data, 0, packetLength);
-        service.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Thread.sleep(sendingPing);
-                    synchronized (sendingMonitor) {
-                        sendingPacket.setAddress(address);
-                        sendingPacket.setPort(port);
-                        sendingPacket.setData(data);
-                        delegate.send(sendingPacket);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        sender.add(new DataTriplet(address, port, data));
     }
 
     @Override
     public void receive(DatagramPacket packet) throws IOException {
         try {
-            final DataTriplet take = dataQueue.take();
+            final DataTriplet take = receiver.take();
             packet.setAddress(take.address);
             packet.setPort(take.port);
             packet.setData(take.data);
@@ -91,7 +75,7 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
                 final byte[] data = new byte[receivingPacket.getLength()];
                 System.arraycopy(receivingPacket.getData(), 0, data, 0, data.length);
                 final DataTriplet triplet = new DataTriplet(address, port, data);
-                dataQueue.offer(triplet);
+                receiver.offer(triplet);
             }
 
         } catch (IOException e) {
@@ -102,6 +86,12 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
     @Override
     public void close() {
         delegate.close();
+        try {
+            sendT.interrupt();
+            recT.interrupt();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private class DataTriplet {
@@ -123,5 +113,54 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
     @Override
     public boolean isClosed() {
         return delegate.isClosed();
+    }
+
+
+
+    private class Sender implements Runnable {
+
+        private final AtomicQueue<DataTriplet> sendingQueue = new AtomicQueue<DataTriplet>(15000);
+
+        @Override
+        public void run() {
+            AtomicQueue<DataTriplet> sendingQueue = this.sendingQueue;
+            final DatagramPacket sendingPacket = new DatagramPacket(new byte[0], 0);
+
+            try {
+                while (!Thread.interrupted()){
+
+                    DataTriplet poll = sendingQueue.poll();
+
+                    while (poll != null){
+                        long creationTime = poll.creationTime;
+                        long l = System.currentTimeMillis();
+                        while (l - creationTime < sendingPing){
+                            Thread.sleep(1);
+                            l = System.currentTimeMillis();
+                        }
+                        send(poll, sendingPacket);
+                        poll = sendingQueue.poll();
+                    }
+
+                    Thread.sleep(1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return;
+            }
+        }
+
+
+        public void add(DataTriplet triplet){
+            sendingQueue.put(triplet);
+        }
+
+
+        private void send(DataTriplet triplet, DatagramPacket packet) throws Exception {
+            packet.setAddress(triplet.address);
+            packet.setPort(triplet.port);
+            packet.setData(triplet.data);
+            delegate.send(packet);
+        }
     }
 }
