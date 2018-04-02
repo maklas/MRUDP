@@ -49,7 +49,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private final int dcTimeDueToInactivity;
     private volatile long lastCommunicationTime;
-    private boolean dcOnInactivity = true;
+    private volatile boolean dcOnInactivity = true;
 
     private static final int defaultPingCD = 4000;
     private volatile int pingCD = defaultPingCD;
@@ -160,13 +160,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         try {
             fullResponse = futureResponse.get(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e1) {
-            e1.printStackTrace();
+            log(e1);
         } catch (ExecutionException e1) {
-            e1.printStackTrace();
+            log(e1);
         } catch (TimeoutException e1) {
             //when time exceeds
         } catch (CancellationException e1){
-            e1.printStackTrace();
+            log(e1);
         }
 
         if (fullResponse == null){
@@ -362,7 +362,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     }
                     break;
             }
-        } catch (Exception ignore) {}
+        } catch (Exception e) {
+            log(e);
+        }
 
 
     }
@@ -567,19 +569,23 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 sendResponseData(address, port, respBatch);
                 final int expectedSeqBatch = this.lastInsertedSeq + 1;
 
-                if (expectedSeqBatch == seq){
-                    this.lastInsertedSeq = seq;
-                    byte[][] batchPackets;
-                    try {
-                        batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+                try {
+                    byte[][] batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+
+                    if (expectedSeqBatch == seq){
+                        this.lastInsertedSeq = seq;
+
                         for (byte[] batchPacket : batchPackets) {
                             receiveQueue.put(batchPacket);
                         }
-                    } catch (Exception ignore) {}
-                    checkForWaitingDatas();
-                } else if (expectedSeqBatch < seq){
-                    insertIntoWaitingDatas(seq, MRUDPUtils.breakBatchDown(fullPackage));
-                }
+
+                        checkForWaitingDatas();
+                    } else if (expectedSeqBatch < seq){
+                        insertIntoWaitingDatas(seq, MRUDPUtils.breakBatchDown(fullPackage));
+                    }
+
+                } catch (Exception ignore) {}
+
             case reliableResponse:
                 if (packageLength != 5){
                     log("Unexpected response length: " + packageLength);
@@ -596,10 +602,13 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 receiveQueue.put(data);
                 break;
             case unreliableBatch:
-                byte[][] batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
-                for (byte[] batchPacket : batchPackets) {
-                    receiveQueue.put(batchPacket);
-                }
+                byte[][] batchPackets;
+                try {
+                    batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+                    for (byte[] batchPacket : batchPackets) {
+                        receiveQueue.put(batchPacket);
+                    }
+                } catch (Exception ignore) {}
                 break;
             case pingRequest:
                 final long startTime = extractLong(fullPackage, 5);
@@ -634,12 +643,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             case connectionAcknowledgmentResponse:
                 ackDelivered = true;
                 break;
-            case connectionResponseAccepted:
-                //ignore I guess
-                break;
-            case connectionResponseRejected:
-                //ignore I guess
-                break;
             case disconnect:
                 int dataLength = packageLength - 5;
                 if (dataLength == 0){
@@ -650,6 +653,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 break;
             case connectionAcknowledgment:
                 //Ignore I guess
+                break;
+            case connectionResponseAccepted:
+                //ignore I guess
+                break;
+            case connectionResponseRejected:
+                //ignore I guess
                 break;
             default:
                 log("Unknown settings received: " + settings);
@@ -804,7 +813,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             try {
                 updateThread.interrupt();
                 updateThread.join(wait);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+                log(e);
+            }
         }
     }
 
@@ -819,7 +830,9 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             try {
                 updateThread.interrupt();
                 updateThread.join(wait);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+                log(e);
+            }
         }
     }
 
@@ -966,7 +979,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 /* UTILS */
 
     private void log(String msg){
-        //-- System.err.println(msg);
+        //--System.err.println(msg);
     }
 
     private void log(Throwable e){

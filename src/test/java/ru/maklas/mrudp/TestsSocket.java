@@ -5,8 +5,12 @@ import org.junit.Test;
 import org.junit.runners.JUnit4;
 import ru.maklas.locator.*;
 
+import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.Random;
+
+import static ru.maklas.mrudp.MRUDPUtils.disconnect;
 
 @SuppressWarnings("all")
 public class TestsSocket {
@@ -291,6 +295,125 @@ public class TestsSocket {
     }
 
 
+    @Test
+    public void testBadpackets() throws Exception {
+        InetAddress localHost = InetAddress.getLocalHost();
+        int port = 9099;
+        MRUDPServerSocket server = new MRUDPServerSocket(port, 512, new ServerModel() {
+            @Override
+            public ConnectionResponsePackage<byte[]> validateNewConnection(InetAddress address, int port, byte[] userData) {
+                System.out.println("Validating new connection");
+                return ConnectionResponsePackage.accept("123".getBytes());
+            }
+
+            @Override
+            public void registerNewConnection(final MRUDPSocketImpl socket, ConnectionResponsePackage<byte[]> responsePackage, byte[] userData) {
+                System.out.println("Registering new connection");
+                socket.start(50);
+                socket.addDCListener(new MDisconnectionListener() {
+                    @Override
+                    public void onDisconnect(MRUDPSocket socket, String msg) {
+                        System.out.println("Server-Sub dced: " + msg);
+                    }
+                });
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        SocketProcessor processor = new SocketProcessor() {
+                            @Override
+                            public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
+                                System.out.println("Server received data: " + new String(data));
+                            }
+                        };
+
+                        try {
+
+                            while (true){
+                                socket.receive(processor);
+                                Thread.sleep(15);
+                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+                }).start();
+            }
+
+            @Override
+            public void onSocketDisconnected(MRUDPSocketImpl socket, String msg) {
+
+            }
+        });
+        server.start();
+
+        JavaUDPSocket dSocket = new JavaUDPSocket();
+        final MRUDPSocket client = new MRUDPSocketImpl(dSocket, 512, 15000);
+        client.start(50);
+        ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{0});
+        System.out.println(connect.getType());
+        new Thread(new Tester("Client", client, new SocketProcessor() {
+            @Override
+            public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
+                System.out.println("Client received: " + Arrays.toString(data));
+            }
+        })).start();
+
+
+
+        int lastB = -128;
+        byte[] arr = new byte[]{-128, -128, -128, -128, -128};
+        InetAddress address = InetAddress.getLocalHost();
+        DatagramPacket packet = new DatagramPacket(arr, arr.length);
+        packet.setAddress(address);
+        packet.setPort(port);
+        while (nextStep(arr, 1)){
+            randomizeSince(arr, 2);
+            if (arr[0] == disconnect){
+                nextStep(arr, 0);
+                continue;
+            } else if (arr[0] > lastB){
+                lastB = arr[0];
+                System.err.println(lastB);
+            }
+            Thread.sleep(1);
+            //System.out.println(Arrays.toString(arr));
+            dSocket.send(packet);
+        }
+
+        Thread.sleep(5000);
+
+    }
+
+    Random random = new Random();
+
+    private void randomizeSince(byte[] arr, int id){
+        for (int i = id; i < arr.length; i++) {
+            arr[i] = (byte) random.nextInt(256);
+        }
+    }
+
+    private boolean nextStep(byte[] arr){
+        int length = arr.length;
+        if (length == 0){
+            return false;
+        }
+        return nextStep(arr, length - 1);
+    }
+
+    private boolean nextStep(byte[] arr, int id){
+        if (arr[id] == Byte.MAX_VALUE){
+            if (id == 0){
+                return false;
+            }
+            arr[id] = Byte.MIN_VALUE;
+            return nextStep(arr, id - 1);
+        } else{
+            arr[id]++;
+            return true;
+        }
+    }
 
     @Test
     public void packetLoss() throws Exception{
