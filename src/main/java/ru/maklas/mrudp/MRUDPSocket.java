@@ -57,6 +57,15 @@ public interface MRUDPSocket {
     boolean sendBatch(MRUDPBatch batch);
 
     /**
+     * <p>Sends data to connected socket in a batch if current state == CONNECTED</p>
+     * <p>This method provides unreliable byte[] sending. Packets inside of batch will be delivered in the order of sending.
+     * </p>
+     * @param batch Data to be sent
+     * @return <b>False</b> if socket is not connected
+     */
+    boolean sendUnreliableBatch(MRUDPBatch batch);
+
+    /**
      * <p>Sends data to connected socket if current state == CONNECTED</p>
      * <p>This method provides reliable, and ordered byte[] sending. Packet will be delivered in the order of sending.
      * So recommended to use this method from the same thread each time.

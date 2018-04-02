@@ -16,8 +16,7 @@ class MRUDPUtils {
     static final byte connectionAcknowledgmentResponse = 10;
     static final byte disconnect = 11;
     static final byte batch = 12;
-
-    private static final byte[] dcPacket = new byte[]{disconnect, 0, 0, 0, 0};
+    static final byte unreliableBatch = 13;
 
     static byte[] buildReliableRequest (int seq, byte [] data){
         return build5byte(reliableRequest, seq, data);
@@ -123,6 +122,34 @@ class MRUDPUtils {
         return ret;
     }
 
+
+    public static byte[] buildUnreliableBatch(MRUDPBatch batch) {
+        ArrayList<byte[]> array = batch.array;
+        //5 - seq + bath type;
+        //for each byte[] - size (2 bytes) + data;
+        //
+        int retSize = 6;
+        int batchSize = array.size();
+        for (int i = 0; i < batchSize; i++) {
+            retSize += array.get(i).length + 2;
+        }
+
+        byte[] ret = new byte[retSize];
+        ret[0] = MRUDPUtils.unreliableBatch;
+        ret[5] = (byte) batchSize;
+        int position = 6;
+        for (int i = 0; i < batchSize; i++) {
+            byte[] src = array.get(i);
+            int srcLen = src.length;
+            putShort(ret, srcLen, position);
+            System.arraycopy(src, 0, ret, position + 2, srcLen);
+            position += srcLen + 2;
+        }
+        return ret;
+    }
+
+
+
     /**
      * Assumes that batch data is correct. Otherwise will throw Runtime exceptions
      */
@@ -199,8 +226,10 @@ class MRUDPUtils {
             case connectionRequest               : return "ConnectionRequest(" + connectionRequest + ")";
             case connectionResponseAccepted      : return "ConnectionResponseAccepted(" + connectionResponseAccepted + ")";
             case connectionResponseRejected      : return "ConnectionResponseRejected(" + connectionResponseRejected + ")";
-            case connectionAcknowledgment: return "ConnectionResponseAcknowledgment(" + connectionAcknowledgment + ")";
+            case connectionAcknowledgment        : return "ConnectionResponseAcknowledgment(" + connectionAcknowledgment + ")";
             case disconnect                      : return "Disconnect(" + disconnect + ")";
+            case batch                           : return "Batch(" + batch + ")";
+            case unreliableBatch                 : return "UnreliableBatch(" + unreliableBatch + ")";
             default                              : return "UNKNOWN TYPE(" + settingsBytes + ")";
         }
     }

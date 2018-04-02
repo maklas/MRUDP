@@ -218,6 +218,16 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
+    @Override
+    public boolean sendUnreliableBatch(MRUDPBatch batch) {
+        if (isConnected()) {
+            byte[] fullPackage =  buildUnreliableBatch(batch);
+            sendData(fullPackage);
+            return true;
+        }
+        return false;
+    }
+
     public boolean sendOff5(byte[] dataWithOffset5){
         if (isConnected()) {
             int seq = this.seq.getAndIncrement();
@@ -584,6 +594,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                     log("Received unreliable request of 0 length! That will lead to dc");
                 }
                 receiveQueue.put(data);
+                break;
+            case unreliableBatch:
+                byte[][] batchPackets = MRUDPUtils.breakBatchDown(fullPackage);
+                for (byte[] batchPacket : batchPackets) {
+                    receiveQueue.put(batchPacket);
+                }
                 break;
             case pingRequest:
                 final long startTime = extractLong(fullPackage, 5);
