@@ -6,7 +6,7 @@
 
     <groupId>ru.maklas.mrudp</groupId>
     <artifactId>MRUDP</artifactId>
-    <version>2.0</version>
+    <version>3.1</version>
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
