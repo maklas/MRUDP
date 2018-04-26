@@ -60,6 +60,7 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
             packet.setAddress(take.address);
             packet.setPort(take.port);
             System.arraycopy(take.data, 0, packet.getData(), packet.getOffset(), take.data.length);
+            packet.setLength(take.data.length);
             long currentTime = System.currentTimeMillis();
             while (currentTime - take.creationTime < receivingPing){
                 Thread.sleep(1);
@@ -79,7 +80,7 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
                 final InetAddress address = receivingPacket.getAddress();
                 final int port = receivingPacket.getPort();
                 final byte[] data = new byte[receivingPacket.getLength()];
-                System.arraycopy(receivingPacket.getData(), 0, data, 0, data.length);
+                System.arraycopy(receivingPacket.getData(), receivingPacket.getOffset(), data, 0, data.length);
                 final DataTriplet triplet = new DataTriplet(address, port, data);
                 receiver.offer(triplet);
             }
@@ -130,7 +131,7 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
         @Override
         public void run() {
             AtomicQueue<DataTriplet> sendingQueue = this.sendingQueue;
-            final DatagramPacket sendingPacket = new DatagramPacket(new byte[0], 0);
+            final DatagramPacket sendingPacket = new DatagramPacket(new byte[1400], 1400);
 
             try {
                 while (!Thread.interrupted()){
@@ -165,7 +166,8 @@ public class HighPingUDPSocket implements UDPSocket, Runnable{
         private void send(DataTriplet triplet, DatagramPacket packet) throws Exception {
             packet.setAddress(triplet.address);
             packet.setPort(triplet.port);
-            packet.setData(triplet.data);
+            System.arraycopy(triplet.data, 0, packet.getData(), packet.getOffset(), triplet.data.length);
+            packet.setLength(triplet.data.length);
             delegate.send(packet);
         }
     }
