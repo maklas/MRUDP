@@ -2,7 +2,6 @@ package ru.maklas.mrudp;
 
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.runners.JUnit4;
 import ru.maklas.locator.*;
 
 import java.net.DatagramPacket;
@@ -206,10 +205,31 @@ public class TestsSocket {
         });
         server.start();
 
-        final MRUDPSocket client = new MRUDPSocketImpl(512);
+        UDPSocket java = new JavaUDPSocket();
+        //UDPSocket lag = new HighPingUDPSocket(java, 100);
+        //UDPSocket loss = new PacketLossUDPSocket(java, 50);
+        //UDPSocket lossAndLag = new PacketLossUDPSocket(lag, 50);
+        final MRUDPSocket client = new MRUDPSocketImpl(java, 512, 5000){
+            Random random = new Random(5);
+            @Override
+            long getCurrentTimeForNTP() {
+                return super.getCurrentTimeForNTP() + random.nextInt(20) + 90;
+            }
+        };
         client.start(50);
         ConnectionResponse connect = client.connect(5000, localHost, port, new byte[]{0});
         System.out.println(connect.getType());
+        client.launchNTP(1000, 10, new MRUDP_NTP_Listener() {
+            @Override
+            public void onSuccess(MRUDPSocket socket, long offset, int packetsSent, int packetsReceived) {
+                System.out.println("SUCCESS! offset: " + offset + " -> " + packetsReceived + "/" + packetsSent);
+            }
+
+            @Override
+            public void onFailure(MRUDPSocket socket) {
+                System.out.println("Failure");
+            }
+        });
 
 
         Thread.sleep(500);
@@ -503,8 +523,6 @@ public class TestsSocket {
 
         @Override
         public void run() {
-
-
             while (true){
                 try {
                     Thread.sleep(50);

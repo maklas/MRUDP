@@ -19,13 +19,15 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private static volatile int threadCounter;
 
-    private final AtomicReference<SocketState> state = new AtomicReference<SocketState>(SocketState.NOT_CONNECTED);
+    //ADDRESSES
     private InetAddress lastConnectedAddress = null;
     private int lastConnectedPort = -1;
     private InetAddress connectingToAddress = null;
     private int connectingToPort = -1;
+
     private volatile byte[] connectingResponse = null;
     private volatile byte[] connectingRequest = null;
+
     private final AtomicInteger seq = new AtomicInteger(0);
     private final UDPSocket socket;
     private final DatagramPacket sendingPacket;
@@ -36,27 +38,37 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final AtomicQueue<Object> receiveQueue = new AtomicQueue<Object>(10000);
     private volatile int lastInsertedSeq = 0;
 
-    private volatile boolean started = false;
-    private boolean interrupted = false;
-    private volatile boolean processing = false;
+    //LISTENERS
     private volatile MDisconnectionListener[] dcListeners = new MDisconnectionListener[0];
     private volatile MPingListener[] pingListeners = new MPingListener[0];
 
+    //STATE DATA
+    private final AtomicReference<SocketState> state = new AtomicReference<SocketState>(SocketState.NOT_CONNECTED);
+    private volatile boolean started = false;
+    private boolean interrupted = false;
+    private volatile boolean processing = false;
     private boolean createdByServer = false;
     private byte[] responseForConnect = new byte[]{0};
     private volatile boolean ackDelivered = false;
     private static final byte[] zeroLengthByte = new byte[0];
 
+    //AUTO-DC TRACKING
     private final int dcTimeDueToInactivity;
     private volatile long lastCommunicationTime;
     private volatile boolean dcOnInactivity = true;
 
+    //PING
     private static final int defaultPingCD = 4000;
     private volatile int pingCD = defaultPingCD;
     private long lastPingSendTime;
     private volatile float currentPing = 0;
     private Object userData = null;
 
+    //NTP
+    private volatile MRUDP_NTP_Listener ntpListener;
+    private volatile NTPInterractionData[] ntpDatas;
+    private volatile boolean ntpWasSuccessful = false;
+    private volatile long ntpOffset;
 
     private Thread updateThread;
     private Thread receivingThread;
@@ -365,8 +377,37 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         } catch (Exception e) {
             log(e);
         }
+    }
 
+    long getCurrentTimeForNTP(){
+        return System.currentTimeMillis();
+    }
 
+    @Override
+    public void launchNTP(int timeMS, int requests, MRUDP_NTP_Listener listener){
+        if (ntpListener != null){
+            listener.onFailure(this);
+            return;
+        }
+
+        this.ntpListener = listener;
+        this.ntpDatas = new NTPInterractionData[requests];
+        new NTPThread(timeMS, requests).start();
+    }
+
+    @Override
+    public boolean timeIsKnown(){
+        return ntpWasSuccessful;
+    }
+
+    @Override
+    public long getTimeOnConnectedDevice() {
+        return System.currentTimeMillis() + ntpOffset;
+    }
+
+    @Override
+    public long getTimeOffset() {
+        return ntpOffset;
     }
 
     private void sendPing() {
@@ -536,7 +577,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void receiveConnected(InetAddress address, int port, byte[] fullPackage, int packageLength){
-        this.lastCommunicationTime = System.currentTimeMillis();
+        long receivedTime = System.currentTimeMillis();
+        this.lastCommunicationTime = receivedTime;
         if (packageLength < 5){
             log("Received message less than 5 bytes long!");
             return;
@@ -650,6 +692,19 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 } else {
                     receiveQueue.put(new String(fullPackage, 5, dataLength));
                 }
+                break;
+            case ntpRequest:
+                sendData(buildNTPResponse(seq, extractLong(fullPackage, 5), receivedTime));
+                break;
+            case ntpResponse:
+                NTPInterractionData[] ntpDatas = this.ntpDatas;
+                if (ntpDatas == null || seq >= ntpDatas.length || seq < 0){
+                    break;
+                }
+                long t0 = extractLong(fullPackage, 5);
+                long t1 = extractLong(fullPackage, 13);
+                long t2 = extractLong(fullPackage, 21);
+                ntpDatas[seq] = new NTPInterractionData(t0, t1, t2, getCurrentTimeForNTP());
                 break;
             case connectionAcknowledgment:
                 //Ignore I guess
@@ -837,6 +892,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private boolean disconnectByClient(String msg){
+        ntpWasSuccessful = false;
+        ntpOffset = 0;
         if (state.get() != SocketState.NOT_CONNECTED){
             sendData(buildDisconnect(msg));
             state.set(SocketState.NOT_CONNECTED);
@@ -848,6 +905,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void closeByClient(String msg){
+        ntpWasSuccessful = false;
+        ntpOffset = 0;
         interruptUpdateThread();
         interruptReceivingThread();
         if (state.get() != SocketState.NOT_CONNECTED) {
@@ -860,6 +919,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     private void receivedDCByClientOrTimeOut(String msg){
+        ntpWasSuccessful = false;
+        ntpOffset = 0;
         sendData(buildDisconnect(msg));
         state.set(SocketState.NOT_CONNECTED);
         triggerDCListeners(msg);
@@ -868,6 +929,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private boolean dcOrCloseByServer(String msg){
         if (state.get() != SocketState.NOT_CONNECTED){
+            ntpWasSuccessful = false;
+            ntpOffset = 0;
             sendData(buildDisconnect(msg));
             state.set(SocketState.NOT_CONNECTED);
             interruptUpdateThread();
@@ -880,6 +943,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     private void receivedDCByServerOrTimeOut(String msg){
         if (isConnected()) {
+            ntpWasSuccessful = false;
+            ntpOffset = 0;
             state.set(SocketState.NOT_CONNECTED);
             flushBuffers();
             interruptUpdateThread();
@@ -889,6 +954,8 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     void serverStopped(String msg){
+        ntpWasSuccessful = false;
+        ntpOffset = 0;
         sendData(buildDisconnect(msg));
         state.set(SocketState.NOT_CONNECTED);
         interruptUpdateThread();
@@ -1041,6 +1108,92 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             }
         }
         return array;
+    }
+
+
+
+
+    private class NTPThread extends Thread{
+
+        private final int time;
+        private final int attempts;
+
+        public NTPThread(int time, int attempts) {
+            this.time = time;
+            this.attempts = attempts;
+        }
+
+        @Override
+        public void run() {
+            int attempts = this.attempts;
+            int ttw = time / attempts;
+
+            if (ttw < 5){
+                ttw = 5;
+            }
+
+
+            try {
+                for (int i = 0; i < attempts; i++) {
+                    sendNTPReq(i);
+                    Thread.sleep(ttw);
+                }
+
+                long additionalSleepTime = ttw < 30 ? 50 : 25;
+                Thread.sleep(additionalSleepTime); //Additional sleep time to get last response
+                wrapUp();
+            } catch (Exception e) {
+                MRUDP_NTP_Listener l = ntpListener;
+                if (l != null){
+                    l.onFailure(MRUDPSocketImpl.this);
+                }
+                ntpListener = null;
+            }
+        }
+
+        private void wrapUp() {
+            MRUDP_NTP_Listener l = ntpListener;
+            NTPInterractionData[] ntpDatas = MRUDPSocketImpl.this.ntpDatas;
+            if (ntpDatas == null){
+                if (l != null){
+                    l.onFailure(MRUDPSocketImpl.this);
+                }
+                return;
+            }
+            if (l == null){
+                return;
+            }
+
+
+            int successful = 0;
+            double offsetSum = 0;
+            int length = ntpDatas.length;
+            for (int i = 0; i < length; i++) {
+                if (ntpDatas[i] != null){
+                    successful++;
+                    offsetSum += ntpDatas[i].calculateOffset();
+                }
+            }
+            if (successful < 2){
+                ntpListener.onFailure(MRUDPSocketImpl.this);
+            } else {
+                final long offset = Math.round(offsetSum / successful);
+                ntpWasSuccessful = true;
+                ntpOffset = offset;
+                l.onSuccess(MRUDPSocketImpl.this, offset, length, successful);
+            }
+            ntpListener = null;
+        }
+
+        private void sendNTPReq(int i) {
+            byte[] req = new byte[13];
+            req[0] = ntpRequest;
+            putInt(req, i, 1);
+
+            long curr = getCurrentTimeForNTP();
+            putLong(req, curr, 5);
+            sendData(req);
+        }
     }
 
 }

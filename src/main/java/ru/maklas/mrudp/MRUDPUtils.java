@@ -18,6 +18,9 @@ class MRUDPUtils {
     static final byte batch = 12;
     static final byte unreliableBatch = 13;
 
+    static final byte ntpRequest = 14;
+    static final byte ntpResponse = 15;
+
     static byte[] buildReliableRequest (int seq, byte [] data){
         return build5byte(reliableRequest, seq, data);
     }
@@ -119,6 +122,17 @@ class MRUDPUtils {
             System.arraycopy(src, 0, ret, position + 2, srcLen);
             position += srcLen + 2;
         }
+        return ret;
+    }
+
+    public static byte[] buildNTPResponse(int seq, long t0, long t1){
+        byte[] ret = new byte[1 + 4 + 8 + 8 + 8];
+
+        ret[0] = ntpResponse;
+        putInt(ret, seq, 1);
+        putLong(ret, t0, 5);
+        putLong(ret, t1, 13);
+        putLong(ret, System.currentTimeMillis(), 21);
         return ret;
     }
 

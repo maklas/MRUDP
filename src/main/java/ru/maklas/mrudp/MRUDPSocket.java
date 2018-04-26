@@ -166,6 +166,52 @@ public interface MRUDPSocket {
     void setPingUpdateTime(int ms);
 
     /**
+     * <p>
+     * Launches NTP (Network Time Protocol) which tries to find out what time is it on connected device.
+     * After success, {@link #timeIsKnown()} will return true and you can find out current time on other
+     * PC by calling {@link #getTimeOnConnectedDevice()}. By calling {@link #getTimeOffset()}
+     * you can know difference in values between your System.currentTimeMillis() and connected socket's
+     * System.currentTimeMillis().
+     * </p>
+     * <p>
+     *     For successful NTP resolving timeMs divided by requests should be <b>></b> 100
+     *     And amount of requests to be at least 7-10. Since NTP packets can be lost and won't be recovered
+     *     Although, you can figure out the best formula for yourself.
+     * </p>
+     * <p>
+     *     Note.
+     *     1. If there will be only one successful request,
+     *     {@link MRUDP_NTP_Listener#onFailure(MRUDPSocket)} will be called
+     *     2. Creates new that on which Listener's methods will be called.
+     *     please synchronize!
+     * </p>
+     *
+     * @param timeMS for how long should NTP try to determine time difference.
+     * @param requests how many requests to send during NTP time.
+     *                 So <b>time between requests = timeMS / requests</b>
+     * @param listener listener which get notified when NTP is finished. Will be called from a new thread.
+     */
+    void launchNTP(int timeMS, int requests, MRUDP_NTP_Listener listener);
+
+    /**
+     * @return whther or not NTP was launched and finished successfully on current connection or not
+     */
+    boolean timeIsKnown();
+
+    /**
+     * <b> your System.currentTimeMillis() + socket.getTimeOffset == connected device's System.currentTimeMillis()</b>
+     * Returns 0 if NTP was not launched or if was unsuccessful. Check it by calling {@link #timeIsKnown()}
+     * @return Device time offset between your Socket and connected Socket.
+     */
+    long getTimeOffset();
+
+    /**
+     * @return Current time on connected device. Return your time if NTP was not launched or if was unsuccessful.
+     * Check it by calling {@link #timeIsKnown()}
+     */
+    long getTimeOnConnectedDevice();
+
+    /**
      * Sets userData for this socket.
      * Useful when you use single instance of SocketProcessor for processing multiple sockets.
      * Use {@link #getUserData()} to retrieve userData
