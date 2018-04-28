@@ -297,7 +297,7 @@ public interface MRUDPSocket {
      * @return UserData of this socket.
      *          Useful when you use single instance of SocketProcessor for processing multiple sockets.
      */
-    Object getUserData();
+    <T> T getUserData();
 
     /**
      * @return Whether this socket is closed and can't be reused

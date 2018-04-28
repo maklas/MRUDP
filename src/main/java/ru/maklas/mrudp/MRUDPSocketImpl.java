@@ -123,7 +123,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public ConnectionResponse connect(int timeout, InetAddress address, int port, final byte[] data) {
+    public final ConnectionResponse connect(int timeout, InetAddress address, int port, final byte[] data) {
         if (address == null || port < 0) {
             throw new NullPointerException();
         }
@@ -207,7 +207,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean send(byte[] data) {
+    public final boolean send(byte[] data) {
         if (isConnected()) {
             int seq = this.seq.getAndIncrement();
             byte[] fullPackage = buildReliableRequest(seq, data);
@@ -219,7 +219,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean sendBatch(MRUDPBatch batch) {
+    public final boolean sendBatch(MRUDPBatch batch) {
         if (isConnected()) {
             int seq = this.seq.getAndIncrement();
             byte[] fullPackage = buildBatch(seq, batch);
@@ -231,7 +231,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean sendUnreliableBatch(MRUDPBatch batch) {
+    public final boolean sendUnreliableBatch(MRUDPBatch batch) {
         if (isConnected()) {
             byte[] fullPackage =  buildUnreliableBatch(batch);
             sendData(fullPackage);
@@ -240,7 +240,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return false;
     }
 
-    public boolean sendOff5(byte[] dataWithOffset5){
+    public final boolean sendOff5(byte[] dataWithOffset5){
         if (isConnected()) {
             int seq = this.seq.getAndIncrement();
             appendReliableRequest(seq, dataWithOffset5);
@@ -252,7 +252,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean sendUnreliable(byte[] data) {
+    public final boolean sendUnreliable(byte[] data) {
         if (isConnected()) {
             byte[] fullPackage = buildUnreliableRequest(data);
             sendData(fullPackage);
@@ -262,7 +262,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean sendUnreliableOff5(byte[] data) {
+    public final boolean sendUnreliableOff5(byte[] data) {
         if (isConnected()) {
             byte[] fullPackage = appendUnreliableRequest(data);
             sendData(fullPackage);
@@ -340,7 +340,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         updateThread.start();
     }
 
-    void update() {
+    final void update() {
         SocketState socketState = state.get();
 
         try {
@@ -396,17 +396,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean timeIsKnown(){
+    public final boolean timeIsKnown(){
         return ntpWasSuccessful;
     }
 
     @Override
-    public long getTimeOnConnectedDevice() {
+    public final long getTimeOnConnectedDevice() {
         return System.currentTimeMillis() + ntpOffset;
     }
 
     @Override
-    public long getTimeOffset() {
+    public final long getTimeOffset() {
         return ntpOffset;
     }
 
@@ -419,7 +419,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean disconnect(String msg) {
+    public final boolean disconnect(String msg) {
         if (createdByServer){
             return dcOrCloseByServer(msg);
         } else {
@@ -428,17 +428,17 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public boolean disconnect() {
+    public final boolean disconnect() {
         return disconnect(DEFAULT_DC_MSG);
     }
 
     @Override
-    public void close() {
+    public final void close() {
         close(DEFAULT_CLOSE_MSG);
     }
 
     @Override
-    public void close(String msg) {
+    public final void close(String msg) {
         if (createdByServer){
             dcOrCloseByServer(msg);
         } else {
@@ -458,27 +458,27 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public void addDCListener(MDisconnectionListener listener) {
+    public final void addDCListener(MDisconnectionListener listener) {
         this.dcListeners = addObject(this.dcListeners, listener);
     }
 
     @Override
-    public void addPingListener(MPingListener listener) {
+    public final void addPingListener(MPingListener listener) {
         this.pingListeners = addObject(this.pingListeners, listener);
     }
 
     @Override
-    public void removeDCListener(MDisconnectionListener listener) {
+    public final void removeDCListener(MDisconnectionListener listener) {
         this.dcListeners = removeObject(this.dcListeners, listener);
     }
 
     @Override
-    public void removePingListener(MPingListener listener) {
+    public final void removePingListener(MPingListener listener) {
         this.pingListeners = removeObject(this.pingListeners, listener);
     }
 
     @Override
-    public void removeAllListeners() {
+    public final void removeAllListeners() {
         this.pingListeners = new MPingListener[0];
         this.dcListeners = new MDisconnectionListener[0];
     }
@@ -521,7 +521,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public void setPingUpdateTime(final int ms) {
+    public final void setPingUpdateTime(final int ms) {
         final int newPingCD;
 
         if (ms < 0){
@@ -549,7 +549,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     }
 
-    void sendData(byte[] fullPackage){
+    final void sendData(byte[] fullPackage){
         synchronized (requestSendingMonitor) {
             DatagramPacket sendingPacket = this.sendingPacket;
             sendingPacket.setData(fullPackage);
@@ -559,12 +559,21 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 log("IOException while trying to send via DatagramSocket" + e.getMessage());
             }
         }
+        dataWasSent(fullPackage);
     }
+
+    /**
+     * A method that can be overriden for performance profiling purposes.
+     * Gets called every time any data was sent via this Socket. By user or by this implementation
+     * @param data your data that was thrown on UDP. Note that 8 bytes of data is also hidden in UDP header, so
+     *             if you want to calculate data + header add 8 to this data.length
+     */
+    public void dataWasSent(byte[] data){}
 
     /**
      * Only used internally in receiving thread of ServerSocket or ClientSocket
      */
-    void sendResponseData(InetAddress returnAddress, int port, byte[] fullPackage){
+    final void sendResponseData(InetAddress returnAddress, int port, byte[] fullPackage){
         DatagramPacket responsePacket = this.responsePacket;
         responsePacket.setAddress(returnAddress);
         responsePacket.setPort(port);
@@ -574,9 +583,10 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         } catch (Exception e) {
             log("IOException while trying to send via DatagramSocket" + e.getMessage());
         }
+        dataWasSent(fullPackage);
     }
 
-    void receiveConnected(InetAddress address, int port, byte[] fullPackage, int packageLength){
+    final void receiveConnected(InetAddress address, int port, byte[] fullPackage, int packageLength){
         long receivedTime = System.currentTimeMillis();
         this.lastCommunicationTime = receivedTime;
         if (packageLength < 5){
@@ -721,7 +731,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    void receiveWhileConnecting(InetAddress address, int port, byte[] fullPackage, int packageLength){
+    final void receiveWhileConnecting(InetAddress address, int port, byte[] fullPackage, int packageLength){
         this.lastCommunicationTime = System.currentTimeMillis();
         if (packageLength < 5){
             log("Received message less than 5 bytes long!");
@@ -774,12 +784,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     /* SOCKET ITERATOR */
 
     @Override
-    public void stop() {
+    public final void stop() {
         interrupted = true;
     }
 
     @Override
-    public boolean isProcessing() {
+    public final boolean isProcessing() {
         return processing;
     }
 
@@ -953,7 +963,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         }
     }
 
-    void serverStopped(String msg){
+    final void serverStopped(String msg){
         ntpWasSuccessful = false;
         ntpOffset = 0;
         sendData(buildDisconnect(msg));
@@ -971,69 +981,69 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     /* GETTERS */
 
     @Override
-    public boolean isConnected() {
+    public final boolean isConnected() {
         return state.get() == SocketState.CONNECTED;
     }
 
     @Override
-    public SocketState getState() {
+    public final SocketState getState() {
         return state.get();
     }
 
     @Override
-    public InetAddress getRemoteAddress() {
+    public final InetAddress getRemoteAddress() {
         return lastConnectedAddress;
     }
 
     @Override
-    public int getRemotePort() {
+    public final int getRemotePort() {
         return lastConnectedPort;
     }
 
-    public int getLocalPort(){
+    public final int getLocalPort(){
         return socket.getLocalPort();
     }
 
     @Override
-    public float getPing() {
+    public final float getPing() {
         return currentPing;
     }
 
     @Override
-    public Object setUserData(Object userData) {
+    public final Object setUserData(Object userData) {
         Object oldUserData = this.userData;
         this.userData = userData;
         return oldUserData;
     }
 
     @Override
-    public void pauseDCcheck() {
+    public final void pauseDCcheck() {
         dcOnInactivity = false;
     }
 
     @Override
-    public boolean dcCheckIsPaused() {
+    public final boolean dcCheckIsPaused() {
         return dcOnInactivity;
     }
 
     @Override
-    public void resumeDCcheck() {
+    public final void resumeDCcheck() {
         lastCommunicationTime = System.currentTimeMillis();
         dcOnInactivity = true;
     }
 
     @Override
-    public int getCurrentSeq() {
+    public final int getCurrentSeq() {
         return seq.get();
     }
 
     @Override
-    public Object getUserData() {
-        return userData;
+    public final <T> T getUserData() {
+        return (T) userData;
     }
 
     @Override
-    public boolean isClosed() {
+    public final boolean isClosed() {
         if (createdByServer){
             if (updateThread == null){
                 return false;
@@ -1045,12 +1055,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
 /* UTILS */
 
-    private void log(String msg){
+    public void log(String msg){
         //--System.err.println(msg);
     }
 
-    private void log(Throwable e){
-        e.printStackTrace();
+    public void log(Throwable e){
+
     }
 
 
