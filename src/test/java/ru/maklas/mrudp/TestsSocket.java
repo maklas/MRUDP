@@ -440,7 +440,12 @@ public class TestsSocket {
 
         InetAddress localHost = InetAddress.getLocalHost();
         int port = 9000;
-        MRUDPServerSocket server = new MRUDPServerSocket(new PacketLossUDPSocket(new JavaUDPSocket(port), 50), 512, new ServerModel() {
+
+
+        UDPSocket serverSock = new PacketLossUDPSocket(new JavaUDPSocket(port), 80);
+        UDPSocket clientSock = new PacketLossUDPSocket(new JavaUDPSocket(    ), 80);
+
+        MRUDPServerSocket server = new MRUDPServerSocket(serverSock, 512, new ServerModel() {
             @Override
             public ConnectionResponsePackage<byte[]> validateNewConnection(InetAddress address, int port, byte[] userData) {
                 return ConnectionResponsePackage.accept(new byte[0]);
@@ -454,30 +459,42 @@ public class TestsSocket {
                     @Override
                     public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
                         int received = MRUDPUtils.extractInt(data, 0);
-                        int toSend = received + 1048576;
+                        int toSend = received + 1000000000;
                         System.out.println("Server received " + MRUDPUtils.extractInt(data, 0) + " and responding with " + toSend);
                         byte[] sendingBytes = new byte[4];
                         MRUDPUtils.putInt(sendingBytes, toSend, 0);
                         socket.send(sendingBytes);
                     }
                 })).start();
+
+                socket.addPingListener(new MPingListener() {
+                    @Override
+                    public void onPingUpdated(MRUDPSocket socket, float newPing) {
+                        System.out.println("Server ping: " + newPing);
+                    }
+                });
             }
 
             @Override
             public void onSocketDisconnected(MRUDPSocketImpl socket, String msg) {
                 System.out.println("Server dc");
             }
-        }, 7000);
-
+        }, 15000);
         server.start();
 
-        MRUDPSocketImpl client = new MRUDPSocketImpl(new PacketLossUDPSocket(new JavaUDPSocket(), 50), 512, 7000);
+        MRUDPSocketImpl client = new MRUDPSocketImpl(clientSock, 512, 7000);
         client.start(75);
 
         client.addDCListener(new MDisconnectionListener() {
             @Override
             public void onDisconnect(MRUDPSocket socket, String msg) {
                 System.out.println("client dc");
+            }
+        });
+        client.addPingListener(new MPingListener() {
+            @Override
+            public void onPingUpdated(MRUDPSocket socket, float newPing) {
+                System.out.println("Client ping: " + newPing);
             }
         });
 
@@ -488,17 +505,17 @@ public class TestsSocket {
         new Thread(new Tester("Client", client, new SocketProcessor() {
             @Override
             public void process(byte[] data, MRUDPSocket socket, SocketIterator iterator) {
-                System.out.println("Client received: " + (MRUDPUtils.extractInt(data, 0) - 1048576));
+                System.out.println("Client received: " + (MRUDPUtils.extractInt(data, 0)));
             }
         })).start();
 
 
         Thread.sleep(500);
         for (int i = 0; i < 10000; i++) {
-            byte[] in = new byte[4];
+            byte[] in = new byte[50];
             MRUDPUtils.putInt(in, i, 0);
             client.send(in);
-            Thread.sleep(10);
+            Thread.sleep(5);
         }
 
 
@@ -525,7 +542,7 @@ public class TestsSocket {
         public void run() {
             while (true){
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(16);
 
                     socket.receive(processor);
                 } catch (InterruptedException e) {
