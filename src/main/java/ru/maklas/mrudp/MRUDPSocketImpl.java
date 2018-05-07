@@ -793,7 +793,12 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         return processing;
     }
 
-
+    @Override
+    public int getSendBufferSize(){
+        synchronized (requestList){
+            return requestList.size;
+        }
+    }
 
 
 

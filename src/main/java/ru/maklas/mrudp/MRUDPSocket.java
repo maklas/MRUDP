@@ -264,6 +264,12 @@ public interface MRUDPSocket {
     SocketState getState();
 
     /**
+     * Don't call this method a lot, since it's synchronized very tightly with internals. Might block for a period of time/
+     * @return how many packets are in resend queue, waiting to be received by connectedSocket.
+     */
+    int getSendBufferSize();
+
+    /**
      * @return <b>True</b> if this socket is connected to any remote Socket. Same as getState() == CONNECTED
      */
     boolean isConnected();
