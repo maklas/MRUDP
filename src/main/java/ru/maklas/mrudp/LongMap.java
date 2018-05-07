@@ -11,7 +11,6 @@ import java.util.NoSuchElementException;
  * next higher POT size.
  * @author Nathan Sweet */
 class LongMap<V> implements Iterable<LongMap.Entry<V>> {
-    private static final int PRIME1 = 0xbe1f14b1;
     private static final int PRIME2 = 0xb4b82e39;
     private static final int PRIME3 = 0xced1c241;
     private static final int EMPTY = 0;
@@ -80,15 +79,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
     }
 
     public void put (long key, V value) {
-        if (key == 0) {
-            zeroValue = value;
-            if (!hasZeroValue) {
-                hasZeroValue = true;
-                size++;
-            }
-            return;
-        }
-
         long[] keyTable = this.keyTable;
 
         // Check for existing keys.
@@ -144,11 +134,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
         }
 
         push(key, value, index1, key1, index2, key2, index3, key3);
-    }
-
-    public void putAll (LongMap<V> map) {
-        for (Entry<V> entry : map.entries())
-            put(entry.key, entry.value);
     }
 
     /** Skips checks for existing keys. */
@@ -275,10 +260,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
     }
 
     public V get (long key) {
-        if (key == 0) {
-            if (!hasZeroValue) return null;
-            return zeroValue;
-        }
         int index = (int)(key & mask);
         if (keyTable[index] != key) {
             index = hash2(key);
@@ -378,28 +359,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
             valueTable[index] = null;
     }
 
-    /** Reduces the size of the backing arrays to be the specified capacity or less. If the capacity is already less, nothing is
-     * done. If the map contains more items than the specified capacity, the next highest power of two capacity is used instead. */
-    public void shrink (int maximumCapacity) {
-        if (maximumCapacity < 0) throw new IllegalArgumentException("maximumCapacity must be >= 0: " + maximumCapacity);
-        if (size > maximumCapacity) maximumCapacity = size;
-        if (capacity <= maximumCapacity) return;
-        maximumCapacity = RandomXS128.nextPowerOfTwo(maximumCapacity);
-        resize(maximumCapacity);
-    }
-
-    /** Clears the map and reduces the size of the backing arrays to be the specified capacity if they are larger. */
-    public void clear (int maximumCapacity) {
-        if (capacity <= maximumCapacity) {
-            clear();
-            return;
-        }
-        zeroValue = null;
-        hasZeroValue = false;
-        size = 0;
-        resize(maximumCapacity);
-    }
-
     public void clear () {
         if (size == 0) return;
         long[] keyTable = this.keyTable;
@@ -412,27 +371,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
         stashSize = 0;
         zeroValue = null;
         hasZeroValue = false;
-    }
-
-    /** Returns true if the specified value is in the map. Note this traverses the entire map and compares every value, which may be
-     * an expensive operation. */
-    public boolean containsValue (Object value, boolean identity) {
-        V[] valueTable = this.valueTable;
-        if (value == null) {
-            if (hasZeroValue && zeroValue == null) return true;
-            long[] keyTable = this.keyTable;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (keyTable[i] != EMPTY && valueTable[i] == null) return true;
-        } else if (identity) {
-            if (value == zeroValue) return true;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (valueTable[i] == value) return true;
-        } else {
-            if (hasZeroValue && value.equals(zeroValue)) return true;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (value.equals(valueTable[i])) return true;
-        }
-        return false;
     }
 
     public boolean containsKey (long key) {
@@ -453,36 +391,6 @@ class LongMap<V> implements Iterable<LongMap.Entry<V>> {
         for (int i = capacity, n = i + stashSize; i < n; i++)
             if (keyTable[i] == key) return true;
         return false;
-    }
-
-    /** Returns the key for the specified value, or <tt>notFound</tt> if it is not in the map. Note this traverses the entire map
-     * and compares every value, which may be an expensive operation.
-     * @param identity If true, uses == to compare the specified value with values in the map. If false, uses
-     *           {@link #equals(Object)}. */
-    public long findKey (Object value, boolean identity, long notFound) {
-        V[] valueTable = this.valueTable;
-        if (value == null) {
-            if (hasZeroValue && zeroValue == null) return 0;
-            long[] keyTable = this.keyTable;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (keyTable[i] != EMPTY && valueTable[i] == null) return keyTable[i];
-        } else if (identity) {
-            if (value == zeroValue) return 0;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (valueTable[i] == value) return keyTable[i];
-        } else {
-            if (hasZeroValue && value.equals(zeroValue)) return 0;
-            for (int i = capacity + stashSize; i-- > 0;)
-                if (value.equals(valueTable[i])) return keyTable[i];
-        }
-        return notFound;
-    }
-
-    /** Increases the size of the backing array to accommodate the specified number of additional items. Useful before adding many
-     * items to avoid multiple backing array resizes. */
-    public void ensureCapacity (int additionalCapacity) {
-        int sizeNeeded = size + additionalCapacity;
-        if (sizeNeeded >= threshold) resize(RandomXS128.nextPowerOfTwo((int)Math.ceil(sizeNeeded / loadFactor)));
     }
 
     private void resize (int newSize) {

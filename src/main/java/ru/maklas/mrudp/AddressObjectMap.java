@@ -12,8 +12,7 @@ public class AddressObjectMap<T> {
     private final LongMap<T> map = new LongMap<T>();
 
     public void put(InetAddress address, int port, T o){
-        long hash = hash(address, port);
-        map.put(hash, o);
+        map.put(hash(address, port), o);
     }
 
     public T get(InetAddress address, int port){
@@ -21,9 +20,7 @@ public class AddressObjectMap<T> {
     }
 
     private static long hash(InetAddress address, int port){
-        long ret = address.hashCode();
-        ret += ((long) port) << 32;
-        return ret;
+        return ((long) address.hashCode()) << 32 + port;
     }
 
     public T remove(InetAddress address, int port) {
