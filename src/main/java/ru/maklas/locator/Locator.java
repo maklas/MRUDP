@@ -101,19 +101,25 @@ public class Locator {
             }
         });
 
+        synchronized (sleepingMonitor) {
+            sleepingThread = Thread.currentThread();
+            isSleeping = true;
+        }
+
+        boolean interrupted = false;
         try {
-            synchronized (sleepingMonitor) {
-                sleepingThread = Thread.currentThread();
-                isSleeping = true;
-            }
             Thread.sleep(discoveryTimeMS);
-            synchronized (sleepingMonitor) {
-                isSleeping = false;
-            }
-        } catch (InterruptedException e) {}
+        } catch (InterruptedException e) {
+            interrupted = true;
+        }
+
+        synchronized (sleepingMonitor) {
+            isSleeping = false;
+            sleepingThread = null;
+        }
         receiver.stop();
         discovering.set(false);
-        responseNotifier.finish();
+        responseNotifier.finish(interrupted);
         return true;
 
     }
