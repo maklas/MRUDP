@@ -125,6 +125,43 @@ class MRUDPUtils {
         return ret;
     }
 
+    /**
+     * @return (byte[] batchRequest, int currentPosition)
+     */
+    public static Object[] buildSafeBatch(final int seq, MRUDPBatch batch, final int pos, int bufferSize) {
+        ArrayList<byte[]> array = batch.array;
+        int retSize = 6;
+        int batchSize = array.size();
+        int endIIncluded = pos;
+        for (int i = pos; i < batchSize; i++) {
+            int length = array.get(i).length;
+            if (retSize + length + 2> bufferSize){
+                break;
+            }
+            endIIncluded = i;
+            retSize += length + 2;
+        }
+
+        if (retSize == 6){
+            throw new RuntimeException("Can't fit byte[] if length " + array.get(pos).length + " in bufferSize of length " + bufferSize + ". Make sure it's at least 8 bytes more than source byte[]");
+        }
+
+        int safeBatchSize = endIIncluded - pos + 1;
+        byte[] ret = new byte[retSize];
+        ret[0] = MRUDPUtils.batch;
+        putInt(ret, seq, 1);
+        ret[5] = (byte) safeBatchSize;
+        int position = 6;
+        for (int i = pos; i <= endIIncluded; i++) {
+            byte[] src = array.get(i);
+            int srcLen = src.length;
+            putShort(ret, srcLen, position);
+            System.arraycopy(src, 0, ret, position + 2, srcLen);
+            position += srcLen + 2;
+        }
+        return new Object[]{ret, Integer.valueOf(endIIncluded + 1)};
+    }
+
     public static byte[] buildNTPResponse(int seq, long t0, long t1){
         byte[] ret = new byte[1 + 4 + 8 + 8 + 8];
 

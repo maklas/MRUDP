@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 import java.util.concurrent.*;
@@ -228,6 +229,48 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public final boolean sendBigBatch(MRUDPBatch batch){
+        if (!isConnected()){
+            return false;
+        }
+        int size = batch.size();
+        switch (size){
+            case 0: return true;
+            case 1:
+                int seq = this.seq.getAndIncrement();
+                byte[] fullPackage = buildReliableRequest(seq, batch.get(0));
+                saveRequest(seq, fullPackage);
+                sendData(fullPackage);
+                return true;
+        }
+
+        ArrayList<byte[]> array = batch.array;
+
+        int retSize = 6;
+        int batchSize = array.size();
+        for (int i = 0; i < batchSize; i++) {
+            retSize += array.get(i).length + 2;
+        }
+
+        int bufferSize = this.bufferSize;
+        if (retSize <= bufferSize){
+            return sendBatch(batch);
+        }
+
+        int i = 0;
+        while (i < size){
+            int seq = this.seq.getAndIncrement();
+            Object[] tuple = buildSafeBatch(seq, batch, i, bufferSize);
+            byte[] fullPackage = (byte[]) tuple[0];
+            i = ((Integer) tuple[1]);
+            saveRequest(seq, fullPackage);
+            sendData(fullPackage);
+        }
+
+        return true;
     }
 
     @Override

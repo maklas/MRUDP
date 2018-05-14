@@ -38,6 +38,40 @@ public class TestsSocket {
     }
 
     @Test
+    public void testBigBatch() {
+        int bufferSize = 512;
+
+        byte[] one   = new byte[]{1, 2, 3, 4, 5, 6}; //6
+        byte[] two   = new byte[]{11, 12, 13, 14, 15, 16}; //6
+        byte[] three = new byte[]{21, 22, 23, 24, 25, 26, 27, 28}; //8
+        byte[] four  = new byte[]{31, 32, 33, 34, 35, 36, 37, 38}; //8
+        byte[] five  = new byte[]{41, 42, 43, 44, 45, 46, 47, 48}; //8
+        byte[] six   = new byte[]{51, 52, 53, 54, 55, 56, 57, 58}; //8
+        byte[] seven = new byte[]{61, 62, 63, 64, 65, 66, 67, 68}; //8
+        byte[] eight = new byte[]{71, 72, 73, 74, 75, 76, 77, 78}; //8
+
+        MRUDPBatch batch = new MRUDPBatch();
+        batch.add(one  );
+        batch.add(two  );
+        batch.add(three);
+        batch.add(four );
+        batch.add(five );
+        batch.add(six  );
+        batch.add(seven);
+        batch.add(eight);
+
+        Array<byte[]> packets = new Array<byte[]>();
+        int i = 0;
+        int seq = 0;
+        while (i < batch.size()){
+            Object[] objects = MRUDPUtils.buildSafeBatch(seq++, batch, i, bufferSize);
+            i = ((Integer) objects[1]);
+            packets.add(((byte[]) objects[0]));
+        }
+        System.out.println("END");
+    }
+
+    @Test
     public void testBatchInSocket() throws Exception {
         InetAddress localHost = InetAddress.getLocalHost();
         int port = 9090;
@@ -305,7 +339,7 @@ public class TestsSocket {
             }
 
             @Override
-            public void finish() {
+            public void finish(boolean interrupted) {
 
             }
         });
