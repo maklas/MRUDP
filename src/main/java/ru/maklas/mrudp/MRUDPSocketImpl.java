@@ -221,14 +221,25 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public final boolean sendBatch(MRUDPBatch batch) {
-        if (isConnected()) {
-            int seq = this.seq.getAndIncrement();
-            byte[] fullPackage = buildBatch(seq, batch);
-            saveRequest(seq, fullPackage);
-            sendData(fullPackage);
-            return true;
+        if (!isConnected()){
+            return false;
         }
-        return false;
+        int size = batch.size();
+        switch (size){
+            case 0: return true;
+            case 1:
+                int seq1 = this.seq.getAndIncrement();
+                byte[] fullPackage1 = buildReliableRequest(seq1, batch.get(0));
+                saveRequest(seq1, fullPackage1);
+                sendData(fullPackage1);
+                return true;
+            default :
+                int seq = this.seq.getAndIncrement();
+                byte[] fullPackage = buildBatch(seq, batch);
+                saveRequest(seq, fullPackage);
+                sendData(fullPackage);
+                return true;
+        }
     }
 
     @Override
@@ -247,18 +258,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 return true;
         }
 
-        ArrayList<byte[]> array = batch.array;
-
-        int retSize = 6;
-        int batchSize = array.size();
-        for (int i = 0; i < batchSize; i++) {
-            retSize += array.get(i).length + 2;
-        }
-
         int bufferSize = this.bufferSize;
-        if (retSize <= bufferSize){
-            return sendBatch(batch);
-        }
 
         int i = 0;
         while (i < size){
