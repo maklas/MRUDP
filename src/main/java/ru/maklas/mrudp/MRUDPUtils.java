@@ -128,7 +128,7 @@ class MRUDPUtils {
     /**
      * @return (byte[] batchRequest, int currentPosition)
      */
-    public static Object[] buildSafeBatch(final int seq, MRUDPBatch batch, final int pos, int bufferSize) {
+    public static Object[] buildSafeBatch(final int seq, byte settings, MRUDPBatch batch, final int pos, int bufferSize) {
         ArrayList<byte[]> array = batch.array;
         int retSize = 6;
         int batchSize = array.size();
@@ -148,7 +148,7 @@ class MRUDPUtils {
 
         int safeBatchSize = endIIncluded - pos + 1;
         byte[] ret = new byte[retSize];
-        ret[0] = MRUDPUtils.batch;
+        ret[0] = settings;
         putInt(ret, seq, 1);
         ret[5] = (byte) safeBatchSize;
         int position = 6;
