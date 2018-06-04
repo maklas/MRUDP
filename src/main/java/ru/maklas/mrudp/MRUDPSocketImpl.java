@@ -124,7 +124,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     }
 
     @Override
-    public final ConnectionResponse connect(int timeout, InetAddress address, int port, final byte[] data) {
+    public final ConnectionResponse connect(final int timeout, InetAddress address, int port, final byte[] data) {
         if (address == null || port < 0) {
             throw new NullPointerException();
         }
@@ -159,10 +159,14 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         final Future<byte[]> futureResponse = e.submit(new Callable<byte[]>() {
             @Override
             public byte[] call() throws Exception {
+                final int awaits = 5;
+                long attempts = (long) (Math.ceil(timeout / awaits) + 1);
+                long currentAttempt = 0;
                 byte[] ret = connectingResponse;
-                while (ret == null){
-                    Thread.sleep(5);
+                while (ret == null && currentAttempt < attempts){
+                    Thread.sleep(awaits);
                     ret = connectingResponse;
+                    currentAttempt++;
                 }
                 currentPing = (float)(System.currentTimeMillis() - connectStartTime);
                 return ret;
