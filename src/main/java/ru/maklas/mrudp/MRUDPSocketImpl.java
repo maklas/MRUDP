@@ -18,6 +18,10 @@ import static ru.maklas.mrudp.MRUDPUtils.*;
  */
 public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
+    /**
+     * Maximal size of receiving queue. Don't put too little or might be some problems
+     */
+    public static int receivingQueueSize = 5000;
     private static volatile int threadCounter;
 
     //ADDRESSES
@@ -36,7 +40,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
     private final Object requestSendingMonitor = new Object();
     private final int bufferSize;
 
-    private final AtomicQueue<Object> receiveQueue = new AtomicQueue<Object>(10000);
+    private final AtomicQueue<Object> receiveQueue = new AtomicQueue<Object>(receivingQueueSize);
     private volatile int lastInsertedSeq = 0;
 
     //LISTENERS
