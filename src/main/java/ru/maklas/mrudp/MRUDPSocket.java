@@ -51,6 +51,10 @@ public interface MRUDPSocket {
      * So recommended to use this method from the same thread each time.
      * Packets will be resent over and over until socket on the other end received it or disconnection occurs
      * </p>
+     * <p>
+     *     summary size of bytes in batch can be bigger than bufferSize, however all of byte arrays that are in the batch
+     *     must be less than bufferSize!
+     * </p>
      * @param batch Data to be sent
      * @return <b>False</b> if socket is not connected
      */
@@ -58,22 +62,11 @@ public interface MRUDPSocket {
 
     /**
      * <p>Sends data to connected socket in a batch if current state == CONNECTED</p>
-     * <p>This method provides reliable, and ordered byte[] sending. Packet will be delivered in the order of sending.
-     * So recommended to use this method from the same thread each time.
-     * Packets will be resent over and over until socket on the other end received it or disconnection occurs
+     * <p>This method provides unreliable byte[] sending.
      * </p>
      * <p>
-     *     Main difference with {@link #sendBatch(MRUDPBatch)} is that if batch won't fit, it will be devided in small batches.
-     *     Make sure that all byte[] lengths are less than bufferSize - 8;
-     * </p>
-     * @param batch Data to be sent
-     * @return <b>False</b> if socket is not connected
-     */
-    boolean sendBigBatch(MRUDPBatch batch);
-
-    /**
-     * <p>Sends data to connected socket in a batch if current state == CONNECTED</p>
-     * <p>This method provides unreliable byte[] sending. Packets inside of batch will be delivered in the order of sending.
+     *     summary size of bytes in batch can be bigger than bufferSize, however all of byte arrays that are in the batch
+     *     must be less than bufferSize!
      * </p>
      * @param batch Data to be sent
      * @return <b>False</b> if socket is not connected

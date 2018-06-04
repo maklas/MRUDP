@@ -229,29 +229,6 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         switch (size){
             case 0: return true;
             case 1:
-                int seq1 = this.seq.getAndIncrement();
-                byte[] fullPackage1 = buildReliableRequest(seq1, batch.get(0));
-                saveRequest(seq1, fullPackage1);
-                sendData(fullPackage1);
-                return true;
-            default :
-                int seq = this.seq.getAndIncrement();
-                byte[] fullPackage = buildBatch(seq, batch);
-                saveRequest(seq, fullPackage);
-                sendData(fullPackage);
-                return true;
-        }
-    }
-
-    @Override
-    public final boolean sendBigBatch(MRUDPBatch batch){
-        if (!isConnected()){
-            return false;
-        }
-        int size = batch.size();
-        switch (size){
-            case 0: return true;
-            case 1:
                 int seq = this.seq.getAndIncrement();
                 byte[] fullPackage = buildReliableRequest(seq, batch.get(0));
                 saveRequest(seq, fullPackage);
@@ -264,7 +241,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
         int i = 0;
         while (i < size){
             int seq = this.seq.getAndIncrement();
-            Object[] tuple = buildSafeBatch(seq, batch, i, bufferSize);
+            Object[] tuple = buildSafeBatch(seq, MRUDPUtils.batch, batch, i, bufferSize);
             byte[] fullPackage = (byte[]) tuple[0];
             i = ((Integer) tuple[1]);
             saveRequest(seq, fullPackage);
@@ -276,12 +253,29 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
 
     @Override
     public final boolean sendUnreliableBatch(MRUDPBatch batch) {
-        if (isConnected()) {
-            byte[] fullPackage =  buildUnreliableBatch(batch);
-            sendData(fullPackage);
-            return true;
+        if (!isConnected()){
+            return false;
         }
-        return false;
+        int size = batch.size();
+        switch (size){
+            case 0: return true;
+            case 1:
+                byte[] fullPackage = buildUnreliableRequest(batch.get(0));
+                sendData(fullPackage);
+                return true;
+        }
+
+        int bufferSize = this.bufferSize;
+
+        int i = 0;
+        while (i < size){
+            Object[] tuple = buildSafeBatch(0, MRUDPUtils.unreliableBatch, batch, i, bufferSize);
+            byte[] fullPackage = (byte[]) tuple[0];
+            i = ((Integer) tuple[1]);
+            sendData(fullPackage);
+        }
+
+        return true;
     }
 
     public final boolean sendOff5(byte[] dataWithOffset5){

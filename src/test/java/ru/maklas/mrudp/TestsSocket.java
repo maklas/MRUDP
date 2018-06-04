@@ -64,7 +64,7 @@ public class TestsSocket {
         int i = 0;
         int seq = 0;
         while (i < batch.size()){
-            Object[] objects = MRUDPUtils.buildSafeBatch(seq++, batch, i, bufferSize);
+            Object[] objects = MRUDPUtils.buildSafeBatch(seq++, MRUDPUtils.batch, batch, i, bufferSize);
             i = ((Integer) objects[1]);
             packets.add(((byte[]) objects[0]));
         }
