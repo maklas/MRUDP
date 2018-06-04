@@ -168,6 +168,7 @@ public class MRUDPSocketImpl implements MRUDPSocket, SocketIterator {
                 return ret;
             }
         });
+        e.shutdown();
 
         byte[] fullResponse = null;
         try {
