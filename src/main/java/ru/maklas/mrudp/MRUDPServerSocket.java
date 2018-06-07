@@ -217,6 +217,13 @@ public class MRUDPServerSocket {
         }
     }
 
+    /**
+     * UDP socket used in this instance
+     */
+    public UDPSocket getUDPSocket() {
+        return socket;
+    }
+
     private void log(String msg){
         System.err.println(msg);
     }
